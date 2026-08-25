@@ -1,1 +1,171 @@
 @import "tailwindcss";
+
+@theme {
+  --font-display: "Orbitron", "IBM Plex Sans", sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-void: #04060d;
+  --color-abyss: #070b16;
+  --color-deep: #0a1122;
+  --color-line: #1b2a49;
+  --color-ink: #e9f1ff;
+  --color-dim: #8fa3c8;
+  --color-faint: #5a6d94;
+  --color-cy: #53e8ff;
+  --color-am: #ffb454;
+  --color-mint: #39f0c3;
+  --color-rose: #ff7a9c;
+}
+
+html, body, #root { height: 100%; }
+
+body {
+  background: #04060d;
+  color: #e9f1ff;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: rgba(83, 232, 255, 0.3); }
+
+* { scrollbar-width: thin; scrollbar-color: #1b2a49 transparent; }
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-thumb { background: #1b2a49; border-radius: 3px; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+:focus-visible {
+  outline: 2px solid rgba(83, 232, 255, 0.7);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@layer components {
+  .pv-panel {
+    background: linear-gradient(160deg, rgba(13, 21, 40, 0.88), rgba(7, 11, 22, 0.82));
+    border: 1px solid rgba(96, 145, 255, 0.14);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 18px 50px -20px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(160, 200, 255, 0.06);
+  }
+  .pv-panel-solid {
+    background: linear-gradient(165deg, #0d1528 0%, #080d1b 100%);
+    border: 1px solid rgba(96, 145, 255, 0.16);
+    box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.9);
+  }
+  .pv-hud-btn {
+    @apply inline-flex items-center gap-1.5 rounded-md border border-[rgba(96,145,255,0.2)] bg-[rgba(13,21,40,0.7)] px-2.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-[#a9bde2] backdrop-blur-md transition-all duration-200;
+  }
+  .pv-hud-btn:hover {
+    @apply border-[rgba(83,232,255,0.5)] text-[#53e8ff];
+    box-shadow: 0 0 18px -4px rgba(83, 232, 255, 0.45);
+    transform: translateY(-1px);
+  }
+  .pv-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-5 py-2.5 font-display text-[12px] font-bold uppercase tracking-[0.22em] text-[#03121a] transition-all duration-200;
+    background: linear-gradient(100deg, #53e8ff, #39f0c3);
+    box-shadow: 0 0 26px -6px rgba(83, 232, 255, 0.65);
+  }
+  .pv-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 40px -6px rgba(83, 232, 255, 0.9); }
+  .pv-btn-primary:active { transform: translateY(0); }
+  .pv-btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-md border border-[rgba(96,145,255,0.25)] px-5 py-2.5 font-display text-[12px] font-bold uppercase tracking-[0.22em] text-[#a9bde2] transition-all duration-200;
+  }
+  .pv-btn-ghost:hover { @apply border-[rgba(83,232,255,0.5)] text-[#53e8ff]; box-shadow: 0 0 20px -6px rgba(83, 232, 255, 0.5); }
+  .label-xs { @apply font-mono text-[10px] uppercase tracking-[0.24em] text-[#5a6d94]; }
+  .num { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+}
+
+/* ---- range inputs ---- */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 18px;
+  background: transparent;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(83, 232, 255, 0.55), rgba(57, 240, 195, 0.25) 60%, rgba(96, 145, 255, 0.12));
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -5.5px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #0a1122;
+  border: 2px solid #53e8ff;
+  box-shadow: 0 0 12px rgba(83, 232, 255, 0.7);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.25); box-shadow: 0 0 18px rgba(83, 232, 255, 0.95); }
+input[type="range"]::-moz-range-track {
+  height: 3px; border-radius: 2px;
+  background: linear-gradient(90deg, rgba(83, 232, 255, 0.55), rgba(96, 145, 255, 0.12));
+}
+input[type="range"]::-moz-range-thumb {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: #0a1122; border: 2px solid #53e8ff;
+  box-shadow: 0 0 12px rgba(83, 232, 255, 0.7);
+}
+
+/* ---- overlays ---- */
+.vignette {
+  background: radial-gradient(ellipse at center, transparent 52%, rgba(2, 4, 10, 0.55) 100%);
+}
+.scanlines {
+  background: repeating-linear-gradient(0deg, rgba(160, 200, 255, 0.028) 0px, rgba(160, 200, 255, 0.028) 1px, transparent 1px, transparent 3px);
+}
+.hud-corners::before, .hud-corners::after {
+  content: "";
+  position: absolute;
+  width: 22px; height: 22px;
+  border-color: rgba(83, 232, 255, 0.5);
+  border-style: solid;
+  pointer-events: none;
+}
+.hud-corners::before { top: 10px; left: 10px; border-width: 1.5px 0 0 1.5px; }
+.hud-corners::after { bottom: 10px; right: 10px; border-width: 0 1.5px 1.5px 0; }
+
+/* ---- animation ---- */
+@keyframes pv-fade-up {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pv-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes pv-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+@keyframes pv-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+@keyframes pv-spin { to { transform: rotate(360deg); } }
+@keyframes pv-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.anim-fade-up { animation: pv-fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.anim-fade { animation: pv-fade 0.5s ease both; }
+.anim-pulse { animation: pv-pulse 2.6s ease-in-out infinite; }
+.anim-blink { animation: pv-blink 1.4s ease-in-out infinite; }
+.anim-spin-slow { animation: pv-spin 14s linear infinite; }
+
+.eq-line {
+  background: linear-gradient(90deg, rgba(83,232,255,0.12), rgba(57,240,195,0.05));
+  border-left: 2px solid rgba(83, 232, 255, 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-up, .anim-fade { animation-duration: 0.01s; }
+  .anim-pulse, .anim-blink, .anim-spin-slow { animation: none; }
+  * { transition-duration: 0.01ms !important; }
+}
