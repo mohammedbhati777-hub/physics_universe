@@ -4,7 +4,6 @@ import { Line } from "@react-three/drei";
 import * as THREE from "three";
 import { useStore } from "../store";
 import { projectile, pendulumStep, collide1D, clamp } from "../physics";
-import { ImgSprite } from "./ImgSprite";
 
 const UPV = new THREE.Vector3(0, 1, 0);
 function orient(g: THREE.Object3D, dir: [number, number, number], len: number) {
@@ -91,8 +90,7 @@ function ProjectileScene() {
       <mesh position={[0, h0 * s * 0.5, 0]}><boxGeometry args={[0.1, Math.max(0.1, h0 * s), 0.1]} /><meshStandardMaterial color="#3a4a70" /></mesh>
       {/* projectile */}
       <group ref={ball} position={[0, h0 * s + 0.16, 0]}>
-        <mesh><sphereGeometry args={[0.13, 18, 18]} /><meshStandardMaterial color="#ffd08a" emissive="#b56a14" emissiveIntensity={1.4} /></mesh>
-        <ImgSprite name="ball" size={0.72} />
+        <mesh><sphereGeometry args={[0.17, 18, 18]} /><meshStandardMaterial color="#ffd08a" emissive="#b56a14" emissiveIntensity={1.2} /></mesh>
         <pointLight color="#ffb454" intensity={0.5} distance={3} />
       </group>
       <group ref={vel}><ArrowMesh color="#39f0c3" /></group>
@@ -136,9 +134,8 @@ function PendulumScene() {
       <group position={[0, 5.68, 0]} ref={arm}>
         <mesh position={[0, -Lv / 2, 0]}><cylinderGeometry args={[0.028, 0.028, Lv, 8]} /><meshStandardMaterial color="#c8d6f0" roughness={0.35} metalness={0.4} /></mesh>
         <mesh position={[0, -Lv, 0]}>
-          <sphereGeometry args={[bobR * 0.8, 24, 24]} />
-          <meshStandardMaterial color="#ffb454" emissive="#8a4d0d" emissiveIntensity={1.1} roughness={0.25} />
-          <ImgSprite name="steel" size={bobR * 3} />
+          <sphereGeometry args={[bobR, 24, 24]} />
+          <meshStandardMaterial color="#ffb454" emissive="#8a4d0d" emissiveIntensity={0.9} roughness={0.25} />
         </mesh>
       </group>
       <mesh position={[0, 5.68, 0]}><sphereGeometry args={[0.09, 12, 12]} /><meshStandardMaterial color="#53e8ff" emissive="#0d5c75" emissiveIntensity={1} /></mesh>
@@ -212,12 +209,10 @@ function CollisionScene() {
       <LabGround />
       <mesh position={[0, 0.28, 0]}><boxGeometry args={[15, 0.05, 0.5]} /><meshStandardMaterial color="#141f3a" roughness={0.8} /></mesh>
       <group ref={ballA} position={[-5, 0.3 + rA, 0]}>
-        <mesh><sphereGeometry args={[rA * 0.8, 26, 26]} /><meshStandardMaterial color="#ffb454" emissive="#8a4d0d" emissiveIntensity={0.9} roughness={0.3} /></mesh>
-        <ImgSprite name="ball" size={rA * 3.1} />
+        <mesh><sphereGeometry args={[rA, 26, 26]} /><meshStandardMaterial color="#ffb454" emissive="#8a4d0d" emissiveIntensity={0.7} roughness={0.3} /></mesh>
       </group>
       <group ref={ballB} position={[5, 0.3 + rB, 0]}>
-        <mesh><sphereGeometry args={[rB * 0.8, 26, 26]} /><meshStandardMaterial color="#53e8ff" emissive="#0d5c75" emissiveIntensity={0.9} roughness={0.3} /></mesh>
-        <ImgSprite name="steel" size={rB * 3.1} />
+        <mesh><sphereGeometry args={[rB, 26, 26]} /><meshStandardMaterial color="#53e8ff" emissive="#0d5c75" emissiveIntensity={0.7} roughness={0.3} /></mesh>
       </group>
       <group ref={arrowA}><ArrowMesh color="#ffb454" /></group>
       <group ref={arrowB}><ArrowMesh color="#53e8ff" /></group>

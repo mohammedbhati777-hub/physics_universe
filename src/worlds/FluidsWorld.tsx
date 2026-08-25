@@ -2,9 +2,6 @@ import { useRef } from "react";
 import { useStore, WORLDS } from "../store";
 import { WorldTabs, ControlPanel, Slider, Stat, EqButton, useCanvasLoop, CanvasFrame } from "../components/ui";
 import { buoyancy, venturi, hydraulic, fmt, clamp } from "../physics";
-import { drawObj, preloadSprites } from "../sprites";
-
-preloadSprites(["ice", "steel", "ball"]);
 
 const META = WORLDS.find((w) => w.id === "fluids")!;
 const FLUIDS: [string, number][] = [["Oil", 850], ["Water", 1000], ["Seawater", 1025], ["Glycerin", 1260], ["Mercury", 13550]];
@@ -50,27 +47,17 @@ function BuoyancyCanvas() {
     blockY.current += dy * clamp(dt * 2.2, 0, 1);
     const by = blockY.current + (b.sinks ? 0 : Math.sin(_t * 1.4) * 2.5);
 
-    // the floating/sinking object — a real asset where we have one
-    const objName = Math.abs(rho - 917) < 20 ? "ice" : rho >= 2500 ? "steel" : Math.abs(rho - 2700) > 50 && rho < 1200 ? "ball" : null;
-    let drewObj = false;
-    if (objName) drewObj = drawObj(ctx, objName, cx, by, size * 1.25, objName === "ball" ? _t * 0.4 : 0);
-    if (!drewObj) {
-      ctx.save();
-      ctx.shadowColor = "rgba(255,138,92,0.5)";
-      ctx.shadowBlur = 12;
-      ctx.fillStyle = "#ff8a5c";
-      ctx.fillRect(cx - size / 2, by - size / 2, size, size);
-      ctx.restore();
-    }
-    ctx.fillStyle = drewObj ? "#e9f1ff" : "#071018";
+    ctx.save();
+    ctx.shadowColor = "rgba(255,138,92,0.5)";
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = "#ff8a5c";
+    ctx.fillRect(cx - size / 2, by - size / 2, size, size);
+    ctx.restore();
+    ctx.fillStyle = "#071018";
     ctx.font = "700 11px 'IBM Plex Mono', monospace";
     ctx.textAlign = "center";
-    if (drewObj) {
-      ctx.fillText(`ρ = ${rho} kg/m³`, cx, by + size / 2 + 20);
-    } else {
-      ctx.fillText(`ρ = ${rho}`, cx, by + 3);
-      ctx.fillText("kg/m³", cx, by + 16);
-    }
+    ctx.fillText(`ρ = ${rho}`, cx, by + 3);
+    ctx.fillText("kg/m³", cx, by + 16);
 
     // force arrows (per kg: weight 9.81 down, buoyancy up)
     const wLen = 46;
