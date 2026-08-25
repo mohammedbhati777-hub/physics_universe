@@ -3,6 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useStore, WorldMeta, WORLDS, REDUCED_MOTION } from "../store";
 import { GlowSprite } from "./Universe";
+import { ImgSprite } from "./ImgSprite";
 import { sfx } from "../sfx";
 
 function MechanicsVisual() {
@@ -163,7 +164,7 @@ function QuantumVisual() {
 }
 
 function GravityVisual() {
-  const apple = useRef<THREE.Mesh>(null);
+  const apple = useRef<THREE.Group>(null);
   const orb = useRef<THREE.Mesh>(null);
   useFrame((s) => {
     const t = REDUCED_MOTION ? 0 : s.clock.elapsedTime;
@@ -178,7 +179,10 @@ function GravityVisual() {
   return (
     <group>
       <mesh position={[-0.55, -0.85, 0]}><sphereGeometry args={[0.5, 28, 28]} /><meshStandardMaterial color="#c96a3c" roughness={0.65} emissive="#5a2410" emissiveIntensity={0.55} /></mesh>
-      <mesh ref={apple}><sphereGeometry args={[0.11, 12, 12]} /><meshStandardMaterial color="#ff5c5c" emissive="#7a1414" emissiveIntensity={0.8} /></mesh>
+      <group ref={apple}>
+        <mesh><sphereGeometry args={[0.09, 12, 12]} /><meshStandardMaterial color="#ff5c5c" emissive="#7a1414" emissiveIntensity={0.8} /></mesh>
+        <ImgSprite name="ball" size={0.5} />
+      </group>
       <mesh ref={orb}><sphereGeometry args={[0.13, 12, 12]} /><meshStandardMaterial color="#b9c6de" roughness={0.85} /></mesh>
       <mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[1.5, 0.01, 6, 56]} /><meshBasicMaterial color="#ff8a5c" transparent opacity={0.3} /></mesh>
     </group>

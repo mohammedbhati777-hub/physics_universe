@@ -2,6 +2,9 @@ import { useEffect, useRef } from "react";
 import { useStore, WORLDS } from "../store";
 import { WorldTabs, ControlPanel, Slider, Stat, EqButton, useCanvasLoop, CanvasFrame } from "../components/ui";
 import { PLANETS, freeFall, cavendishF, fmt, clamp } from "../physics";
+import { drawObj, preloadSprites } from "../sprites";
+
+preloadSprites(["feather", "paper", "ball", "steel"]);
 
 const META = WORLDS.find((w) => w.id === "gravity")!;
 
@@ -188,14 +191,18 @@ function FreeFallCanvas() {
     ctx.fillStyle = "rgba(255,138,92,0.25)";
     ctx.fillRect(trackX - 60, botY, 120, 8);
 
-    // falling body
+    // falling body — a real object per terminal-velocity preset
     const yNow = botY - cur.h * scale;
-    ctx.save();
-    ctx.shadowColor = "rgba(255,138,92,0.8)";
-    ctx.shadowBlur = 12;
-    ctx.fillStyle = "#ff8a5c";
-    ctx.beginPath(); ctx.arc(trackX, yNow, 10, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
+    const objName = vt <= 10 ? "feather" : vt <= 20 ? "paper" : vt <= 60 ? "ball" : "steel";
+    const spin = objName === "feather" || objName === "paper" ? Math.sin(tNow * 3) * 0.5 : tNow * 2.5;
+    if (!drawObj(ctx, objName, trackX, yNow, objName === "ball" || objName === "steel" ? 34 : 42, spin)) {
+      ctx.save();
+      ctx.shadowColor = "rgba(255,138,92,0.8)";
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = "#ff8a5c";
+      ctx.beginPath(); ctx.arc(trackX, yNow, 10, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
     // velocity vector
     const vlen = clamp(cur.v * 1.3, 0, 110);
     if (vlen > 4) {

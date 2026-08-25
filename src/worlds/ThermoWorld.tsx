@@ -2,6 +2,9 @@ import { useRef } from "react";
 import { useStore, WORLDS } from "../store";
 import { WorldTabs, ControlPanel, Slider, Stat, EqButton, useCanvasLoop, CanvasFrame } from "../components/ui";
 import { idealGas, carnot, newtonCooling, R_GAS, fmt, clamp } from "../physics";
+import { drawObj, preloadSprites } from "../sprites";
+
+preloadSprites(["flame", "ice"]);
 
 const META = WORLDS.find((w) => w.id === "thermo")!;
 
@@ -59,6 +62,13 @@ function GasCanvas() {
     ctx.strokeStyle = "#8fa3c8";
     ctx.strokeRect(bx, y0 - 14, 16, y1 - y0 + 28);
     ctx.beginPath(); ctx.moveTo(bx + 16, (y0 + y1) / 2); ctx.lineTo(bx + 46, (y0 + y1) / 2); ctx.stroke();
+    // burner flame under the chamber, sized by temperature
+    const heat = clamp((T - 100) / 900, 0, 1);
+    const bflick = 1 + Math.sin(_t * 16) * 0.14;
+    ctx.save();
+    ctx.globalAlpha = 0.35 + heat * 0.65;
+    drawObj(ctx, "flame", x0 + boxW / 2, y1 + 26, (26 + heat * 42) * bflick, Math.sin(_t * 11) * 0.1);
+    ctx.restore();
 
     // particles
     ctx.save();
@@ -184,12 +194,17 @@ function CarnotCanvas() {
     ctx.strokeRect(w - resW - 14, 14, resW, 26);
     ctx.fillStyle = "#ff7b6b";
     ctx.fillText(`hot ${Th} K`, w - resW / 2 - 14, 31);
+    // fire feeding the hot reservoir
+    const flick = 1 + Math.sin(_t * 14) * 0.12;
+    drawObj(ctx, "flame", w - resW - 40, 27, 44 * flick, Math.sin(_t * 9) * 0.12);
     ctx.fillStyle = "rgba(83,232,255,0.16)";
     ctx.fillRect(w - resW - 14, h - 42, resW, 26);
     ctx.strokeStyle = "#53e8ff";
     ctx.strokeRect(w - resW - 14, h - 42, resW, 26);
     ctx.fillStyle = "#53e8ff";
     ctx.fillText(`cold ${Math.round(Tc)} K`, w - resW / 2 - 14, h - 25);
+    // ice sink
+    drawObj(ctx, "ice", w - resW - 40, h - 29, 36);
 
     // cycle
     ctx.strokeStyle = "rgba(255,123,107,0.9)";
