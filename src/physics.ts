@@ -289,3 +289,103 @@ export function slitPattern(lambdaNm: number, dUm: number, L = 1.2, N = 480): Sl
   };
   return { xs, cdf, sample, maxI };
 }
+
+/* ================= GRAVITY ================= */
+export const PLANETS: { name: string; g: number }[] = [
+  { name: "Moon", g: 1.62 },
+  { name: "Mars", g: 3.71 },
+  { name: "Earth", g: 9.81 },
+  { name: "Neptune", g: 11.15 },
+  { name: "Jupiter", g: 24.79 },
+  { name: "Sun", g: 274 },
+];
+
+export interface FallOut { pts: { t: number; h: number; v: number }[]; tImpact: number; vt: number }
+export function freeFall(h0: number, g: number, vt: number): FallOut {
+  h0 = clamp(h0, 10, 500); g = clamp(g, 0.4, 30); vt = clamp(vt, 3, 200);
+  const pts: { t: number; h: number; v: number }[] = [];
+  let t = 0; let h = h0;
+  const dt = 0.02;
+  while (h > 0 && t < 400) {
+    const v = vt * (1 - Math.exp((-g * t) / vt));
+    h = h0 - vt * t + ((vt * vt) / g) * (1 - Math.exp((-g * t) / vt));
+    pts.push({ t, h: Math.max(0, h), v });
+    if (h <= 0) break;
+    t += dt;
+  }
+  const vEnd = vt * (1 - Math.exp((-g * t) / vt));
+  if (pts[pts.length - 1]?.h !== 0) pts.push({ t, h: 0, v: vEnd });
+  return { pts, tImpact: t, vt };
+}
+
+export const cavendishF = (m1: number, m2: number, r: number) =>
+  gravityForce(clamp(m1, 1, 1e5), clamp(m2, 1, 1e5), clamp(r, 0.05, 5));
+
+export function binaryPeriod(m1Sol: number, m2Sol: number, aAU: number) {
+  const M = (clamp(m1Sol, 0.1, 20) + clamp(m2Sol, 0.1, 20)) * 1.989e30;
+  const a = clamp(aAU, 0.2, 20) * 1.496e11;
+  const T = 2 * Math.PI * Math.sqrt((a * a * a) / (G * M));
+  return { T, years: T / 3.156e7, days: T / 86400 };
+}
+
+/* ================= THERMODYNAMICS ================= */
+export const R_GAS = 8.314; // J/(mol·K)
+export function idealGas(n: number, TK: number, vL: number) {
+  n = clamp(n, 0.05, 10); TK = clamp(TK, 50, 1500); vL = clamp(vL, 1, 40);
+  const P = (n * R_GAS * TK) / (vL * 1e-3); // Pa
+  return { P, rms: Math.sqrt((3 * R_GAS * TK) / 0.028) }; // N₂, M = 28 g/mol
+}
+
+export function carnot(Th: number, Tc: number) {
+  Th = clamp(Th, 120, 2000); Tc = clamp(Tc, 50, 1950);
+  if (Tc >= Th) Tc = Th - 1;
+  const eff = Math.max(0, 1 - Tc / Th);
+  const Qh = 1000; // 1 kJ absorbed per cycle (reference)
+  return { eff, W: eff * Qh, Qc: Qh * (1 - eff), Qh, Th, Tc };
+}
+
+export const newtonCooling = (T0: number, Tenv: number, k: number, t: number) =>
+  Tenv + (T0 - Tenv) * Math.exp(-clamp(k, 0.001, 1) * Math.max(0, t));
+
+/* ================= FLUIDS ================= */
+export function buoyancy(rhoObj: number, rhoF: number) {
+  rhoObj = clamp(rhoObj, 50, 20000); rhoF = clamp(rhoF, 100, 20000);
+  const ratio = rhoObj / rhoF;
+  return {
+    sub: clamp(ratio, 0, 1),
+    sinks: ratio > 1.0001,
+    FbPerKg: ratio >= 1 ? (rhoF / rhoObj) * 9.81 : 9.81, // N of buoyancy per kg of object
+    ratio,
+  };
+}
+
+export function venturi(v1: number, ratio: number, rho = 1000, P1 = 101325) {
+  v1 = clamp(v1, 0.5, 15); ratio = clamp(ratio, 1.2, 5);
+  const v2 = v1 * ratio; // continuity: A₁v₁ = A₂v₂
+  const dP = 0.5 * rho * (v1 * v1 - v2 * v2); // Bernoulli
+  return { v2, P2: P1 + dP, dP };
+}
+
+export function hydraulic(F1: number, ratio: number) {
+  F1 = clamp(F1, 10, 3000); ratio = clamp(ratio, 2, 100);
+  return { F2: F1 * ratio, MA: ratio };
+}
+
+/* ================= MODERN PHYSICS ================= */
+export const lorentz = (beta: number) => 1 / Math.sqrt(1 - clamp(beta, 0, 0.995) ** 2);
+
+export function photoelectric(fTHz: number, phiEv: number) {
+  const f = clamp(fTHz, 100, 3000) * 1e12;
+  phiEv = clamp(phiEv, 0.5, 8);
+  const Eev = (6.62607015e-34 * f) / EV_J;
+  const KE = Eev - phiEv;
+  return { Eev, KE, ejects: KE > 0, f0THz: ((phiEv * EV_J) / 6.62607015e-34) / 1e12 };
+}
+
+export function fissionEnergy(grams: number) {
+  grams = clamp(grams, 0.01, 10000);
+  const N = (grams / 235) * 6.022e23; // U-235 nuclei
+  const EJ = N * 200e6 * EV_J; // ~200 MeV per fission
+  return { EJ, kWh: EJ / 3.6e6, tnt: EJ / 4.184e9 }; // tons of TNT equivalent
+}
+

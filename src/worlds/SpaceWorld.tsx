@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Rocket, RotateCcw } from "lucide-react";
 import { useStore, WORLDS } from "../store";
 import { WorldTabs, ControlPanel, Slider, Stat, Btn, EqButton } from "../components/ui";
-import { G, C_LIGHT, M_EARTH, R_EARTH, gravityForce, orbitPath, circularOrbit, escapePath, fmt } from "../physics";
+import { G, C_LIGHT, M_EARTH, R_EARTH, gravityForce, orbitPath, circularOrbit, escapePath, binaryPeriod, fmt } from "../physics";
 import { sfx } from "../sfx";
 
 const META = WORLDS.find((w) => w.id === "space")!;
@@ -225,6 +225,53 @@ function BlackholeUI() {
   );
 }
 
+/* ================= Binary stars ================= */
+function BinaryUI() {
+  const sim = useStore((s) => s.sim);
+  const setSim = useStore((s) => s.setSim);
+  const openEq = useStore((s) => s.openEq);
+  const m1 = Number(sim.bn_m1); const m2 = Number(sim.bn_m2); const a = Number(sim.bn_a);
+  const bp = binaryPeriod(m1, m2, a);
+  const Mt = m1 + m2;
+  const r1 = (a * m2) / Mt;
+  const r2 = (a * m1) / Mt;
+  return (
+    <>
+      <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 w-[min(21rem,calc(100vw-1.5rem))] md:bottom-4">
+        <div className="pv-panel rounded-xl p-3">
+          <div className="grid grid-cols-2 gap-1.5">
+            <Stat label="Period" value={bp.years >= 1 ? fmt(bp.years, 2) : fmt(bp.days, 0)} unit={bp.years >= 1 ? "yr" : "days"} accent="#ffd08a" />
+            <Stat label="Total mass" value={fmt(Mt, 1)} unit="M☉" />
+            <Stat label="Star A orbit r₁" value={fmt(r1, 2)} unit="AU" accent="#ffd08a" />
+            <Stat label="Star B orbit r₂" value={fmt(r2, 2)} unit="AU" accent="#9beaff" />
+          </div>
+        </div>
+      </div>
+      <ControlPanel
+        title="Binary Controls" color={META.color}
+        footer={<EqButton onClick={() => openEq({
+          title: "Kepler's Third Law (two bodies)",
+          formula: "T² = 4π²a³ / G(M₁ + M₂)",
+          vars: [["M₁", `${m1} M☉`], ["M₂", `${m2} M☉`], ["a", `${a} AU = ${fmt(a * 1.496, 2)} × 10¹¹ m`]],
+          steps: [
+            `T = 2π√(a³ / G(M₁+M₂))`,
+            `in solar units: T = √(a³/(M₁+M₂)) yr = √(${fmt(a * a * a, 1)}/${fmt(Mt, 1)})`,
+            `T = ${fmt(bp.years, 3)} yr = ${fmt(bp.days, 0)} days`,
+            `each star orbits the barycenter: r₁ = a·M₂/M = ${fmt(r1, 2)} AU`,
+          ],
+          result: `T = ${bp.years >= 1 ? fmt(bp.years, 2) + " years" : fmt(bp.days, 0) + " days"}  — both stars obey it`,
+          note: "Astronomers run this backwards: measure T and the orbits, and you can weigh the stars.",
+        })} />}
+      >
+        <Slider label="Star A mass" unit="M☉" min={0.5} max={12} step={0.1} value={m1} onChange={(x) => setSim("bn_m1", x)} />
+        <Slider label="Star B mass" unit="M☉" min={0.5} max={6} step={0.1} value={m2} onChange={(x) => setSim("bn_m2", x)} />
+        <Slider label="Separation a" unit="AU" min={1} max={12} step={0.5} value={a} onChange={(x) => setSim("bn_a", x)} />
+        <p className="text-[10px] leading-relaxed text-[#5a6d94]">The heavier star hugs the barycenter; the lighter one swings wide. Widen the pair and the period stretches — T² ∝ a³.</p>
+      </ControlPanel>
+    </>
+  );
+}
+
 export default function SpaceWorld() {
   const exp = useStore((s) => s.exp);
   const setExp = useStore((s) => s.setExp);
@@ -235,6 +282,7 @@ export default function SpaceWorld() {
       {exp === "satellite" && <SatelliteUI />}
       {exp === "escape" && <EscapeUI />}
       {exp === "blackhole" && <BlackholeUI />}
+      {exp === "binary" && <BinaryUI />}
     </div>
   );
 }

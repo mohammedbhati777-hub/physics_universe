@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Target, Rocket, Moon, Zap, Eye, Waves as WavesIcon, ArrowRight, CheckCircle2, XCircle } from "lucide-react";
+import { Target, Rocket, Moon, Zap, Eye, Waves as WavesIcon, ArrowRight, CheckCircle2, XCircle, Weight, Flame } from "lucide-react";
 import { useStore } from "../store";
 import { Sheet, Slider, Btn, openPanel } from "./ui";
 import { circularOrbit, projectile, K_E, refract, fmt, clamp } from "../physics";
@@ -11,7 +11,7 @@ interface Mission {
   control: { label: string; unit: string; min: number; max: number; step: number; def: number };
   fixed: [string, string][];
   check: (v: number) => { pass: boolean; actual: string; accuracy: number; explanation: string };
-  go: { world: "space" | "mechanics" | "electricity" | "optics" | "waves"; exp: string };
+  go: { world: "space" | "mechanics" | "electricity" | "optics" | "waves" | "gravity" | "thermo"; exp: string };
 }
 
 const MISSIONS: Mission[] = [
@@ -103,6 +103,42 @@ const MISSIONS: Mission[] = [
       };
     },
     go: { world: "waves", exp: "interference" },
+  },
+  {
+    id: "m6", icon: <Weight size={14} />, title: "MISSION 06 — Martian Weigh-In", world: "GRAVITY", expName: "Weight on Worlds",
+    objective: "Choose the mass that makes the scale read exactly 250 N on Mars.",
+    detail: "Weight is a force: W = m·g. On Mars, g = 3.71 m/s².",
+    target: "W = 250 N ± 5 N", xp: 300,
+    control: { label: "Mass on the pan", unit: "kg", min: 10, max: 120, step: 0.5, def: 40 },
+    fixed: [["Planet", "Mars"], ["g", "3.71 m/s²"]],
+    check: (m) => {
+      const W = m * 3.71;
+      const diff = Math.abs(W - 250);
+      return {
+        pass: diff < 5, actual: `W = ${fmt(W, 1)} N`,
+        accuracy: Math.round(clamp(100 - (diff / 5) * 12, 55, 99)),
+        explanation: `m = W/g = 250 / 3.71 ≈ 67.4 kg. Your mass never changes — your weight depends on where you stand.`,
+      };
+    },
+    go: { world: "gravity", exp: "weight" },
+  },
+  {
+    id: "m7", icon: <Flame size={14} />, title: "MISSION 07 — Carnot Limit", world: "THERMO", expName: "Carnot Engine",
+    objective: "A heat engine draws from a 600 K source. Pick the cold-sink temperature that gives exactly 40% efficiency.",
+    detail: "η = 1 − Tc/Th. No engine between two temperatures can beat Carnot.",
+    target: "η = 40% ± 2%", xp: 300,
+    control: { label: "Sink temperature Tc", unit: "K", min: 150, max: 550, step: 5, def: 200 },
+    fixed: [["Th", "600 K"], ["Limit", "Carnot"]],
+    check: (Tc) => {
+      const eta = 1 - Tc / 600;
+      const diff = Math.abs(eta - 0.4) * 100;
+      return {
+        pass: diff < 2, actual: `η = ${fmt(eta * 100, 1)}%`,
+        accuracy: Math.round(clamp(100 - (diff / 2) * 12, 55, 99)),
+        explanation: `Tc = Th(1 − η) = 600 × 0.6 = 360 K. Real engines fall short — irreversibility always collects a tax.`,
+      };
+    },
+    go: { world: "thermo", exp: "carnot" },
   },
 ];
 

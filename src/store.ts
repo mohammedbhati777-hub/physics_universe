@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 export type Phase = "landing" | "universe" | "world";
-export type WorldId = "mechanics" | "electricity" | "waves" | "optics" | "space" | "quantum";
+export type WorldId = "mechanics" | "electricity" | "waves" | "optics" | "space" | "quantum" | "gravity" | "thermo" | "fluids" | "modern";
 export type V3 = [number, number, number];
 
 export interface WorldMeta {
@@ -15,14 +15,14 @@ export interface WorldMeta {
   experiments: { id: string; name: string }[];
 }
 
-const R = 13;
+const R = 16;
 const node = (i: number, y: number): V3 => {
-  const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
+  const a = (i / 10) * Math.PI * 2 + Math.PI / 6;
   return [Math.cos(a) * R, y, Math.sin(a) * R];
 };
 
 export const LANDING_CAM = { pos: [0, 2.5, 44] as V3, look: [0, 1, 0] as V3 };
-export const UNIVERSE_CAM = { pos: [0, 7.5, 23.5] as V3, look: [0, 0, 0] as V3 };
+export const UNIVERSE_CAM = { pos: [0, 8.5, 27.5] as V3, look: [0, 0, 0] as V3 };
 const LAB_CAM = { pos: [0, 3.1, 12.5] as V3, look: [0, 1.4, 0] as V3 };
 const FLAT_CAM = { pos: [0, 0.8, 16] as V3, look: [0, 0, 0] as V3 };
 
@@ -76,6 +76,7 @@ export const WORLDS: WorldMeta[] = [
       { id: "satellite", name: "Satellite Orbit" },
       { id: "escape", name: "Escape Velocity" },
       { id: "blackhole", name: "Black Hole" },
+      { id: "binary", name: "Binary Stars" },
     ],
   },
   {
@@ -87,6 +88,46 @@ export const WORLDS: WorldMeta[] = [
       { id: "tunneling", name: "Tunneling" },
     ],
   },
+  {
+    id: "gravity", name: "GRAVITY", tag: "Weight • Fall • Attraction", color: "#ff8a5c",
+    desc: "Stand on other worlds, drop through atmospheres, and weigh the invisible pull between masses.",
+    pos: node(6, 2.0), cam: FLAT_CAM,
+    experiments: [
+      { id: "weight", name: "Weight on Worlds" },
+      { id: "freefall", name: "Free Fall" },
+      { id: "cavendish", name: "Cavendish Balance" },
+    ],
+  },
+  {
+    id: "thermo", name: "THERMO", tag: "Heat • Gas • Engines", color: "#ff7b6b",
+    desc: "Squeeze a live gas, run the perfect engine, and watch heat bleed away to the room.",
+    pos: node(7, -1.6), cam: FLAT_CAM,
+    experiments: [
+      { id: "gas", name: "Ideal Gas Law" },
+      { id: "carnot", name: "Carnot Engine" },
+      { id: "cooling", name: "Newton's Cooling" },
+    ],
+  },
+  {
+    id: "fluids", name: "FLUIDS", tag: "Buoyancy • Flow • Pressure", color: "#4dd0ff",
+    desc: "Float or sink, accelerate through a venturi, and lift a car with Pascal's principle.",
+    pos: node(8, 0.9), cam: FLAT_CAM,
+    experiments: [
+      { id: "buoyancy", name: "Buoyancy Lab" },
+      { id: "venturi", name: "Venturi Flow" },
+      { id: "hydraulic", name: "Hydraulic Press" },
+    ],
+  },
+  {
+    id: "modern", name: "MODERN", tag: "Relativity • Photons • Nuclei", color: "#ff5ca8",
+    desc: "Slow down time, knock electrons loose with light, and unlock the energy inside mass.",
+    pos: node(9, -2.2), cam: FLAT_CAM,
+    experiments: [
+      { id: "dilation", name: "Time Dilation" },
+      { id: "photoelectric", name: "Photoelectric Effect" },
+      { id: "fission", name: "E = mc² Fission" },
+    ],
+  },
 ];
 
 export const DEFAULTS: Record<WorldId, Record<string, number | boolean>> = {
@@ -94,8 +135,12 @@ export const DEFAULTS: Record<WorldId, Record<string, number | boolean>> = {
   electricity: { ef_q: 3, ohm_V: 9, ohm_R: 15, mag_I: 5, mag_r: 4 },
   waves: { wv_A: 0.5, wv_f: 1.4, wv_l: 2.2, wv_ph: 0, if_d: 2.4, if_f: 1.4, if_ph: 0, dp_vs: 60, dp_vo: 0, dp_f: 800 },
   optics: { rf_th: 40, rr_n1: 1.0, rr_n2: 1.5, rr_th: 45, ln_convex: true, ln_f: 12, ln_u: 30 },
-  space: { gr_m: 2, gr_d: 10, st_alt: 400, st_v: 7.67, st_run: 1, es_v: 11.2, es_run: 1, bh_m: 10 },
+  space: { gr_m: 2, gr_d: 10, st_alt: 400, st_v: 7.67, st_run: 1, es_v: 11.2, es_run: 1, bh_m: 10, bn_m1: 4, bn_m2: 1, bn_a: 6 },
   quantum: { ds_l: 550, ds_d: 2.5, ds_wave: false, ds_run: 1, tn_E: 0.6, tn_V0: 1.2, tn_a: 1.0 },
+  gravity: { wt_m: 10, wt_p: 2, ff_h: 120, ff_g: 9.81, ff_vt: 42, ff_run: 1, cv_m1: 800, cv_m2: 800, cv_r: 0.5 },
+  thermo: { gas_T: 300, gas_V: 12, gas_n: 1, cn_Th: 600, cn_Tc: 300, cl_T0: 90, cl_Tenv: 22, cl_k: 0.06 },
+  fluids: { bu_rho: 650, bu_fluid: 1000, vn_v1: 4, vn_ratio: 2.2, hy_F: 120, hy_ratio: 30 },
+  modern: { td_v: 0.6, pe_f: 700, pe_I: 60, pe_metal: 0, fs_g: 1, fs_run: 1 },
 };
 
 export interface EqPayload {
@@ -121,6 +166,8 @@ export const ACHIEVEMENTS: { id: string; name: string; desc: string; check: (p: 
   { id: "optics", name: "Optics Expert", desc: "Complete the refraction mission", check: (p) => p.missionsDone.includes("m4") },
   { id: "space", name: "Space Navigator", desc: "Achieve a stable orbit mission", check: (p) => p.missionsDone.includes("m1") },
   { id: "quantum", name: "Quantum Explorer", desc: "Enter the quantum world", check: (p) => p.visited.includes("quantum") },
+  { id: "gravity", name: "Gravity Geek", desc: "Explore the gravity world", check: (p) => p.visited.includes("gravity") },
+  { id: "heat", name: "Heat Engineer", desc: "Complete the Carnot mission", check: (p) => p.missionsDone.includes("m7") },
 ];
 
 export const levelFor = (xp: number) => Math.floor(xp / 400) + 1;

@@ -18,6 +18,10 @@ const WavesWorld = lazy(() => import("./worlds/WavesWorld"));
 const OpticsWorld = lazy(() => import("./worlds/OpticsWorld"));
 const SpaceWorld = lazy(() => import("./worlds/SpaceWorld"));
 const QuantumWorld = lazy(() => import("./worlds/QuantumWorld"));
+const GravityWorld = lazy(() => import("./worlds/GravityWorld"));
+const ThermoWorld = lazy(() => import("./worlds/ThermoWorld"));
+const FluidsWorld = lazy(() => import("./worlds/FluidsWorld"));
+const ModernWorld = lazy(() => import("./worlds/ModernWorld"));
 
 /* ---------------- Expo demo controller ---------------- */
 function useDemo() {
@@ -34,7 +38,7 @@ function useDemo() {
       timers.current.push(window.setTimeout(() => { if (useStore.getState().demo) fn(); }, sec * 1000));
 
     at(0.3, () => S().setDemoCaption("Welcome to PHYSICSVERSE — every animation in this universe is a real equation."));
-    at(6, () => { S().begin(); S().setDemoCaption("Six worlds. Eighteen experiments. One universe of physics."); });
+    at(6, () => { S().begin(); S().setDemoCaption("Ten worlds. Thirty-one experiments. One universe of physics."); });
     at(13, () => { S().enterWorld("mechanics"); S().setDemoCaption("MECHANICS — a projectile under gravity, integrated in real time."); });
     at(16, () => { S().sims({ pj_v0: 24, pj_ang: 58, pj_g: 9.81, pj_h0: 1.5, pj_drag: false }); S().bump("pj_run"); });
     at(24, () => {
@@ -130,7 +134,7 @@ function Landing() {
         className="absolute bottom-6 left-5 right-5 flex items-end justify-between sm:left-12 sm:right-12"
       >
         <div className="font-mono text-[9px] uppercase tracking-[0.3em] text-[#3a4a70]">
-          6 worlds / 18 experiments / real SI equations
+          10 worlds / 31 experiments / real SI equations
         </div>
         <div className="anim-pulse font-mono text-[9px] uppercase tracking-[0.3em] text-[#5a6d94]">
           drag to look around
@@ -182,6 +186,10 @@ function WorldStage() {
     case "optics": return <OpticsWorld />;
     case "space": return <SpaceWorld />;
     case "quantum": return <QuantumWorld />;
+    case "gravity": return <GravityWorld />;
+    case "thermo": return <ThermoWorld />;
+    case "fluids": return <FluidsWorld />;
+    case "modern": return <ModernWorld />;
     default: return null;
   }
 }
@@ -230,7 +238,7 @@ export default function App() {
       <ProgressPanel />
       {/* screen-reader summary of the experience */}
       <div className="sr-only">
-        PHYSICSVERSE: an interactive 3D physics education app with six worlds — mechanics, electricity, waves, optics, space and quantum — containing eighteen simulations computed from standard physics equations.
+        PHYSICSVERSE: an interactive 3D physics education app with ten worlds — mechanics, electricity, waves, optics, space, quantum, gravity, thermodynamics, fluids and modern physics — containing thirty-one simulations computed from standard physics equations.
         <Compass size={1} />
       </div>
     </div>

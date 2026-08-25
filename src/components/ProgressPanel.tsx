@@ -36,7 +36,7 @@ export default function ProgressPanel() {
           <div className="label-xs !text-[8px]">Worlds</div>
         </div>
         <div className="rounded-md border border-[rgba(96,145,255,0.12)] bg-[rgba(7,11,22,0.6)] p-2 text-center">
-          <div className="num text-[18px] text-[#ffb454]">{missionsDone.length}<span className="text-[11px] text-[#5a6d94]">/5</span></div>
+          <div className="num text-[18px] text-[#ffb454]">{missionsDone.length}<span className="text-[11px] text-[#5a6d94]">/7</span></div>
           <div className="label-xs !text-[8px]">Missions</div>
         </div>
         <div className="rounded-md border border-[rgba(96,145,255,0.12)] bg-[rgba(7,11,22,0.6)] p-2 text-center">

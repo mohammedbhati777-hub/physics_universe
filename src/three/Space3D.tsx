@@ -244,6 +244,57 @@ function BlackHoleScene() {
   );
 }
 
+/* ---------------- Binary stars (two-body barycenter) ---------------- */
+function BinaryScene() {
+  const g1 = useRef<THREE.Group>(null);
+  const g2 = useRef<THREE.Group>(null);
+  const ring1 = useRef<THREE.Mesh>(null);
+  const ring2 = useRef<THREE.Mesh>(null);
+  const ang = useRef(0);
+  useFrame((_, dt) => {
+    const sim = useStore.getState().sim;
+    const m1 = clamp(Number(sim.bn_m1 ?? 4), 0.5, 12);
+    const m2 = clamp(Number(sim.bn_m2 ?? 1), 0.5, 6);
+    const a = clamp(Number(sim.bn_a ?? 6), 1, 12);
+    if (!useStore.getState().paused) {
+      const dur = clamp(Math.sqrt((a * a * a) / (m1 + m2)) * 2.1, 3, 16); // Kepler: T ∝ √(a³/M)
+      ang.current += (dt / dur) * Math.PI * 2;
+    }
+    const sep = a * 0.42;
+    const r1 = (sep * m2) / (m1 + m2);
+    const r2 = (sep * m1) / (m1 + m2);
+    const place = (g: THREE.Group | null, r: number, m: number, phase: number) => {
+      if (!g) return;
+      g.position.set(Math.cos(ang.current + phase) * r, 1.9, Math.sin(ang.current + phase) * r);
+      const sc = Math.max(0.5, Math.cbrt(m) * 0.62);
+      g.scale.set(sc, sc, sc);
+    };
+    place(g1.current, r1, m1, 0);
+    place(g2.current, r2, m2, Math.PI);
+    if (ring1.current) ring1.current.scale.set(r1, r1, 1);
+    if (ring2.current) ring2.current.scale.set(r2, r2, 1);
+  });
+  return (
+    <group>
+      <mesh position={[0, 1.9, 0]}><sphereGeometry args={[0.06, 12, 12]} /><meshBasicMaterial color="#8fa3c8" /></mesh>
+      <mesh ref={ring1} position={[0, 1.9, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[1, 0.008, 6, 72]} /><meshBasicMaterial color="#ffd08a" transparent opacity={0.4} />
+      </mesh>
+      <mesh ref={ring2} position={[0, 1.9, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[1, 0.008, 6, 72]} /><meshBasicMaterial color="#9beaff" transparent opacity={0.4} />
+      </mesh>
+      <group ref={g1}>
+        <mesh><sphereGeometry args={[0.3, 28, 28]} /><meshStandardMaterial color="#ffd08a" emissive="#c07a20" emissiveIntensity={1.6} /></mesh>
+        <GlowSprite color="rgba(255,208,138,0.6)" scale={2.4} opacity={0.45} />
+      </group>
+      <group ref={g2}>
+        <mesh><sphereGeometry args={[0.24, 28, 28]} /><meshStandardMaterial color="#9beaff" emissive="#2a6a9a" emissiveIntensity={1.3} /></mesh>
+        <GlowSprite color="rgba(155,234,255,0.6)" scale={2} opacity={0.4} />
+      </group>
+    </group>
+  );
+}
+
 export function Space3D() {
   const exp = useStore((s) => s.exp);
   return (
@@ -252,6 +303,7 @@ export function Space3D() {
       {exp === "satellite" && <SatelliteScene />}
       {exp === "escape" && <EscapeScene />}
       {exp === "blackhole" && <BlackHoleScene />}
+      {exp === "binary" && <BinaryScene />}
     </group>
   );
 }
