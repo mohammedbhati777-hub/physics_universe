@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { speak, cancelVoice } from "./voice";
+import { narrate, cancelVoice } from "./voice";
+import { bed, braam, shimmer } from "./sfx";
 
 export type Phase = "landing" | "universe" | "world";
 export type WorldId = "mechanics" | "electricity" | "waves" | "optics" | "space" | "quantum" | "gravity" | "thermo" | "fluids" | "modern";
@@ -131,6 +132,20 @@ export const WORLDS: WorldMeta[] = [
   },
 ];
 
+/* Trailer-style narration lines, spoken as each world is entered. */
+const VOICE_LINES: Record<WorldId, string> = {
+  mechanics: "Where every motion… obeys your command.",
+  electricity: "Invisible forces… made visible.",
+  waves: "The rhythm… of the universe itself.",
+  optics: "Bend the light… and it reveals its secrets.",
+  space: "Feel the pull… of gravity between worlds.",
+  quantum: "Where particles… become waves.",
+  gravity: "The force that binds… the entire cosmos.",
+  thermo: "Heat is motion… made visible.",
+  fluids: "The silent power… of flow.",
+  modern: "Where time itself… begins to bend.",
+};
+
 export const DEFAULTS: Record<WorldId, Record<string, number | boolean>> = {
   mechanics: { pj_v0: 22, pj_ang: 55, pj_g: 9.81, pj_h0: 1.5, pj_drag: false, pj_run: 1, pn_L: 2.5, pn_m: 1.5, pn_g: 9.81, pn_th: 45, pn_run: 1, cl_mA: 2, cl_mB: 3, cl_vA: 4, cl_vB: -2, cl_el: true, cl_run: 1 },
   electricity: { ef_q: 3, ohm_V: 9, ohm_R: 15, mag_I: 5, mag_r: 4 },
@@ -259,7 +274,12 @@ export const useStore = create<PVState>((set, get) => ({
 
   begin: () => {
     set((s) => ({ phase: "universe", cam: { ...UNIVERSE_CAM, id: s.cam.id + 1 } }));
-    speak("Welcome to the world of physics. Explore. Experiment. Understand.");
+    bed(10);
+    narrate([
+      "Welcome…",
+      "…to the world of physics.",
+      "Every law of nature… is now yours to command.",
+    ], 600);
   },
 
   enterWorld: (w) => {
@@ -275,12 +295,15 @@ export const useStore = create<PVState>((set, get) => ({
       sim: { ...DEFAULTS[w] }, paused: false, eq: null,
     });
     persist({ xp, visited, missionsDone: s.missionsDone });
-    speak(`Entering ${meta.name.toLowerCase()}. ${meta.tag.replace(/•/g, ",")}.`);
+    braam();
+    const title = meta.name.charAt(0) + meta.name.slice(1).toLowerCase();
+    narrate([`${title}.`, VOICE_LINES[w]], 550);
   },
 
   leaveWorld: () => {
     set((s) => ({ phase: "universe", cam: { ...UNIVERSE_CAM, id: s.cam.id + 1 }, eq: null, hover: null }));
-    speak("Returning to the universe.");
+    shimmer();
+    narrate(["And now…", "…back to the stars."], 500);
   },
 
   setExp: (e) => set((s) => ({ exp: e, sim: { ...DEFAULTS[s.world] }, eq: null })),
