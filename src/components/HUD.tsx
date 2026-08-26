@@ -3,6 +3,7 @@ import { ArrowLeft, Bot, Clapperboard, Menu, Orbit, Pause, Play, RotateCcw, Targ
 import { useStore, WORLDS, levelFor } from "../store";
 import { openPanel } from "./ui";
 import { sfx, setSfxEnabled } from "../sfx";
+import { setVoiceEnabled } from "../voice";
 
 function Logo() {
   return (
@@ -69,8 +70,14 @@ export default function HUD() {
           <button className="pv-hud-btn" onClick={() => openPanel("missionsOpen")} aria-label="Missions"><Target size={13} /><span className="hidden lg:inline">Missions</span></button>
           <button className="pv-hud-btn" onClick={() => openPanel("progressOpen")} aria-label="Progress"><Trophy size={13} /><span className="hidden lg:inline">Progress</span></button>
           <button className="pv-hud-btn" onClick={() => openPanel("phyxOpen")} aria-label="PHY-X assistant"><Bot size={13} /><span className="hidden lg:inline">PHY-X</span></button>
-          <button className="pv-hud-btn" onClick={() => { toggleSound(); setSfxEnabled(!sound); }} aria-label="Toggle sound">
+          <button
+            className="pv-hud-btn"
+            title={sound ? "Sound & voice: ON" : "Sound & voice: OFF"}
+            onClick={() => { toggleSound(); setSfxEnabled(!sound); setVoiceEnabled(!sound); }}
+            aria-label="Toggle sound and voice narration"
+          >
             {sound ? <Volume2 size={13} /> : <VolumeX size={13} />}
+            <span className="hidden text-[9px] opacity-70 xl:inline">{sound ? "VOICE ON" : "MUTED"}</span>
           </button>
           <button className="pv-hud-btn" onClick={() => { setPanel("menuOpen", !menuOpen); sfx.tick(); }} aria-label="Menu"><Menu size={13} /></button>
         </div>

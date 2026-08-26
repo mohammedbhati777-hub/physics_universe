@@ -10,6 +10,7 @@ import ProgressPanel from "./components/ProgressPanel";
 import { Loader } from "./components/ui";
 import { useStore, WORLDS, WorldId, EqPayload } from "./store";
 import { sfx, setSfxEnabled } from "./sfx";
+import { initVoice, setVoiceEnabled } from "./voice";
 import { projectile, fmt } from "./physics";
 
 const MechanicsWorld = lazy(() => import("./worlds/MechanicsWorld"));
@@ -199,7 +200,14 @@ export default function App() {
   const sound = useStore((s) => s.sound);
   useDemo();
 
-  useEffect(() => { setSfxEnabled(sound); }, [sound]);
+  useEffect(() => {
+    initVoice();
+  }, []);
+
+  useEffect(() => {
+    setSfxEnabled(sound);
+    setVoiceEnabled(sound);
+  }, [sound]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

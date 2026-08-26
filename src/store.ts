@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { speak, cancelVoice } from "./voice";
 
 export type Phase = "landing" | "universe" | "world";
 export type WorldId = "mechanics" | "electricity" | "waves" | "optics" | "space" | "quantum" | "gravity" | "thermo" | "fluids" | "modern";
@@ -256,7 +257,10 @@ export const useStore = create<PVState>((set, get) => ({
   visited: saved.visited,
   missionsDone: saved.missionsDone,
 
-  begin: () => set((s) => ({ phase: "universe", cam: { ...UNIVERSE_CAM, id: s.cam.id + 1 } })),
+  begin: () => {
+    set((s) => ({ phase: "universe", cam: { ...UNIVERSE_CAM, id: s.cam.id + 1 } }));
+    speak("Welcome to the world of physics. Explore. Experiment. Understand.");
+  },
 
   enterWorld: (w) => {
     const meta = WORLDS.find((x) => x.id === w);
@@ -271,9 +275,13 @@ export const useStore = create<PVState>((set, get) => ({
       sim: { ...DEFAULTS[w] }, paused: false, eq: null,
     });
     persist({ xp, visited, missionsDone: s.missionsDone });
+    speak(`Entering ${meta.name.toLowerCase()}. ${meta.tag.replace(/•/g, ",")}.`);
   },
 
-  leaveWorld: () => set((s) => ({ phase: "universe", cam: { ...UNIVERSE_CAM, id: s.cam.id + 1 }, eq: null, hover: null })),
+  leaveWorld: () => {
+    set((s) => ({ phase: "universe", cam: { ...UNIVERSE_CAM, id: s.cam.id + 1 }, eq: null, hover: null }));
+    speak("Returning to the universe.");
+  },
 
   setExp: (e) => set((s) => ({ exp: e, sim: { ...DEFAULTS[s.world] }, eq: null })),
 

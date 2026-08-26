@@ -1,8 +1,13 @@
-/* Voice narration via the Web Speech API — zero assets, lazily initialized.
-   Respects the global sound toggle; always guarded for unsupported browsers. */
+/* Voice narration via the Web Speech API — zero assets.
+   Hardened against the two classic Chrome bugs:
+   1. utterances garbage-collected mid-speech (we keep a live reference)
+   2. the first speak() silently dropped (we warm the engine on first pointerdown)
+   Respects the global sound toggle; fully guarded for unsupported browsers. */
 
 let enabled = true;
 let cachedVoices: SpeechSynthesisVoice[] = [];
+let current: SpeechSynthesisUtterance | null = null;
+let warmed = false;
 
 function synth(): SpeechSynthesis | null {
   try {
@@ -16,9 +21,23 @@ function refreshVoices() {
   try { cachedVoices = s.getVoices() || []; } catch { cachedVoices = []; }
 }
 
-if (typeof window !== "undefined" && "speechSynthesis" in window) {
+/** Call once on app mount. Registers voice loading + the pointerdown warm-up. */
+export function initVoice() {
+  const s = synth();
+  if (!s) return;
   refreshVoices();
-  try { window.speechSynthesis.addEventListener?.("voiceschanged", refreshVoices); } catch { /* older browsers */ }
+  try { s.addEventListener?.("voiceschanged", refreshVoices); } catch { /* older browsers */ }
+  if (!warmed) {
+    const warm = () => {
+      warmed = true;
+      try {
+        refreshVoices();
+        s.cancel();
+        s.resume(); // Chrome can leave the queue "paused" and swallow the first speak()
+      } catch { /* noop */ }
+    };
+    window.addEventListener("pointerdown", warm, { once: true, capture: true });
+  }
 }
 
 export function setVoiceEnabled(b: boolean) {
@@ -28,9 +47,19 @@ export function setVoiceEnabled(b: boolean) {
 
 export function cancelVoice() {
   try { synth()?.cancel(); } catch { /* noop */ }
+  current = null;
 }
 
-const PREFERRED = ["Google UK English Male", "Google US English", "Microsoft Aria", "Microsoft Libby", "Samantha", "Daniel", "Alex"];
+const PREFERRED = [
+  "Google UK English Female",
+  "Google US English",
+  "Microsoft Aria",
+  "Microsoft Libby",
+  "Microsoft Jenny",
+  "Samantha",
+  "Victoria",
+  "Daniel",
+];
 
 function pickVoice(): SpeechSynthesisVoice | null {
   if (!cachedVoices.length) refreshVoices();
@@ -43,7 +72,7 @@ function pickVoice(): SpeechSynthesisVoice | null {
 }
 
 export function speak(text: string, opts: { rate?: number; pitch?: number; interrupt?: boolean } = {}) {
-  if (!enabled) return;
+  if (!enabled || !text) return;
   const s = synth();
   if (!s) return;
   try {
@@ -54,6 +83,10 @@ export function speak(text: string, opts: { rate?: number; pitch?: number; inter
     u.rate = opts.rate ?? 0.97;
     u.pitch = opts.pitch ?? 1;
     u.volume = 1;
+    u.onend = () => { if (current === u) current = null; };
+    u.onerror = () => { if (current === u) current = null; };
+    current = u; // critical: unreferenced utterances get GC'd in Chrome
+    s.resume();
     s.speak(u);
   } catch { /* speech unavailable */ }
 }
