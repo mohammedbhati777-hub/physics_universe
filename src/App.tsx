@@ -138,10 +138,15 @@ function Landing() {
         className="absolute bottom-6 left-5 right-5 flex items-end justify-between sm:left-12 sm:right-12"
       >
         <div className="font-mono text-[9px] uppercase tracking-[0.3em] text-[#3a4a70]">
-          13 worlds / 49 experiments / real SI equations
+          13 worlds / 54 experiments / real SI equations
         </div>
-        <div className="anim-pulse font-mono text-[9px] uppercase tracking-[0.3em] text-[#5a6d94]">
-          drag to look around
+        <div className="flex items-center gap-3">
+          <div className="anim-pulse font-mono text-[9px] uppercase tracking-[0.3em] text-[#5a6d94]">
+            drag to look around
+          </div>
+          <div className="font-mono text-[9px] uppercase tracking-[0.3em] text-[#3a4a70]">
+            Made by <span className="font-bold text-[#53e8ff]">Bhati</span>
+          </div>
         </div>
       </motion.div>
     </motion.div>

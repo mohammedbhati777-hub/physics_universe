@@ -158,6 +158,18 @@ export default function HUD() {
           </motion.div>
         ) : null}
       </AnimatePresence>
+
+      {/* Credits */}
+      <div className="pointer-events-none absolute bottom-3 right-3 z-30 sm:bottom-4 sm:right-4">
+        <div className="pv-panel rounded-lg px-3 py-1.5 sm:px-4 sm:py-2">
+          <div className="flex items-center gap-2">
+            <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#53e8ff]" />
+            <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-[#5a6d94] sm:text-[10px]">
+              Made by <span className="font-bold text-[#53e8ff]">Bhati</span>
+            </span>
+          </div>
+        </div>
+      </div>
     </>
   );
 }
