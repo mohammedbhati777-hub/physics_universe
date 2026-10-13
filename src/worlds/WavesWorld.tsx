@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { useStore, WORLDS } from "../store";
 import { WorldTabs, ControlPanel, Slider, Stat, EqButton, useCanvasLoop, CanvasFrame } from "../components/ui";
-import { waveY, waveSpeed, dopplerShift, V_SOUND, fmt, clamp } from "../physics";
+import { waveY, waveSpeed, dopplerShift, V_SOUND, fmt, clamp, sonicBoom, reverbTime } from "../physics";
 
 const META = WORLDS.find((w) => w.id === "waves")!;
 
@@ -328,6 +328,93 @@ function DopplerUI() {
   );
 }
 
+/* ================= Sonic Boom ================= */
+function SonicBoomUI() {
+  const sim = useStore((s) => s.sim);
+  const setSim = useStore((s) => s.setSim);
+  const openEq = useStore((s) => s.openEq);
+  const v = Number(sim.sb_v ?? 400);
+  const { M, theta } = sonicBoom(v);
+
+  return (
+    <>
+      <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
+        <CanvasFrame className="h-full w-full">
+          <div className="relative h-full w-full">
+            <canvas className="block h-full w-full" />
+            <div className="absolute left-3 top-3 text-[12px] text-[#ff6b6b]">Sonic Boom</div>
+            <div className="absolute left-3 top-7 text-[10px] text-[#8fa3c8]">Mach cone • Shock wave formation</div>
+          </div>
+        </CanvasFrame>
+      </div>
+      <ControlPanel
+        title="Sonic Boom Controls" color={META.color}
+        footer={<EqButton onClick={() => openEq({
+          title: "Sonic Boom",
+          formula: "sin(θ) = 1/M    M = v/vₛ",
+          vars: [["v", `${v} m/s`], ["vₛ", `${V_SOUND} m/s`]],
+          steps: [
+            `M = ${v} / ${V_SOUND} = ${fmt(M, 2)}`,
+            M > 1 ? `θ = arcsin(1/${fmt(M, 2)}) = ${fmt(theta, 1)}°` : "Subsonic — no shock wave",
+          ],
+          result: M > 1 ? `M = ${fmt(M, 2)}    θ = ${fmt(theta, 1)}°` : `M = ${fmt(M, 2)} (subsonic)`,
+          note: "Supersonic objects create a Mach cone. The boom is heard when the cone passes the observer.",
+        })} />}
+      >
+        <Slider label="Velocity" unit="m/s" min={100} max={1000} step={10} value={v} onChange={(x) => setSim("sb_v", x)} />
+        <div className="grid grid-cols-2 gap-1.5">
+          <Stat label="Mach number" value={fmt(M, 2)} unit="" accent={M > 1 ? "#ff6b6b" : "#39f0c3"} />
+          <Stat label="Cone angle" value={M > 1 ? fmt(theta, 1) : "—"} unit={M > 1 ? "°" : ""} />
+        </div>
+      </ControlPanel>
+    </>
+  );
+}
+
+/* ================= Room Acoustics ================= */
+function AcousticsUI() {
+  const sim = useStore((s) => s.sim);
+  const setSim = useStore((s) => s.setSim);
+  const openEq = useStore((s) => s.openEq);
+  const V = Number(sim.ac_V ?? 500);
+  const A = Number(sim.ac_A ?? 100);
+  const T = reverbTime(V, A);
+
+  return (
+    <>
+      <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
+        <CanvasFrame className="h-full w-full">
+          <div className="relative h-full w-full">
+            <canvas className="block h-full w-full" />
+            <div className="absolute left-3 top-3 text-[12px] text-[#a29bfe]">Room Acoustics</div>
+            <div className="absolute left-3 top-7 text-[10px] text-[#8fa3c8]">Reverberation time • Sabine equation</div>
+          </div>
+        </CanvasFrame>
+      </div>
+      <ControlPanel
+        title="Acoustics Controls" color={META.color}
+        footer={<EqButton onClick={() => openEq({
+          title: "Sabine Reverberation",
+          formula: "T₆₀ = 0.161·V/A",
+          vars: [["V", `${V} m³`], ["A", `${A} m² (absorption)`]],
+          steps: [
+            `T₆₀ = 0.161 × ${V} / ${A}`,
+            `T₆₀ = ${fmt(T, 2)} s`,
+          ],
+          result: `T₆₀ = ${fmt(T, 2)} s`,
+          note: "Reverberation time is the time for sound to decay by 60 dB. Concert halls: 1.5-2.5s.",
+        })} />}
+      >
+        <Slider label="Room volume" unit="m³" min={50} max={5000} step={50} value={V} onChange={(x) => setSim("ac_V", x)} />
+        <Slider label="Absorption" unit="m²" min={10} max={1000} step={10} value={A} onChange={(x) => setSim("ac_A", x)} />
+        <div className="grid grid-cols-2 gap-1.5">
+          <Stat label="Reverb time T₆₀" value={fmt(T, 2)} unit="s" accent="#a29bfe" />
+        </div>
+      </ControlPanel>
+    </>
+  );
+}
+
 export default function WavesWorld() {
   const exp = useStore((s) => s.exp);
   const setExp = useStore((s) => s.setExp);
@@ -337,6 +424,8 @@ export default function WavesWorld() {
       {exp === "wave" && <WaveUI />}
       {exp === "interference" && <InterferenceUI />}
       {exp === "doppler" && <DopplerUI />}
+      {exp === "sonicboom" && <SonicBoomUI />}
+      {exp === "acoustics" && <AcousticsUI />}
     </div>
   );
 }

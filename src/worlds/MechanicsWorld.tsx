@@ -274,6 +274,170 @@ function CollisionUI() {
   );
 }
 
+/* ================= Double Pendulum ================= */
+function DoublePendulumUI() {
+  const sim = useStore((s) => s.sim);
+  const setSim = useStore((s) => s.setSim);
+  const bump = useStore((s) => s.bump);
+  const openEq = useStore((s) => s.openEq);
+  const th1 = Number(sim.dp_th1 ?? 120);
+  const th2 = Number(sim.dp_th2 ?? 120);
+  const L1 = Number(sim.dp_L1 ?? 1);
+  const L2 = Number(sim.dp_L2 ?? 1);
+  const m1 = Number(sim.dp_m1 ?? 1);
+  const m2 = Number(sim.dp_m2 ?? 1);
+
+  return (
+    <>
+      <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
+        <div className="pv-panel hud-corners relative h-full w-full overflow-hidden rounded-xl">
+          <canvas className="block h-full w-full" />
+          <div className="absolute left-3 top-3 text-[12px] text-[#ffb454]">Double Pendulum</div>
+          <div className="absolute left-3 top-7 text-[10px] text-[#8fa3c8]">Chaotic motion • Sensitive to initial conditions</div>
+        </div>
+      </div>
+      <ControlPanel
+        title="Double Pendulum Controls" color={META.color}
+        footer={
+          <>
+            <Btn variant="primary" className="flex-1 !py-2 !text-[10px]" onClick={() => { bump("dp_run"); sfx.launch(); }}><Play size={12} /> Release</Btn>
+          </>
+        }
+      >
+        <Slider label="θ₁" unit="°" min={-180} max={180} step={1} value={th1} onChange={(v) => setSim("dp_th1", v)} />
+        <Slider label="θ₂" unit="°" min={-180} max={180} step={1} value={th2} onChange={(v) => setSim("dp_th2", v)} />
+        <Slider label="L₁" unit="m" min={0.5} max={2} step={0.1} value={L1} onChange={(v) => setSim("dp_L1", v)} />
+        <Slider label="L₂" unit="m" min={0.5} max={2} step={0.1} value={L2} onChange={(v) => setSim("dp_L2", v)} />
+        <Slider label="m₁" unit="kg" min={0.5} max={3} step={0.1} value={m1} onChange={(v) => setSim("dp_m1", v)} />
+        <Slider label="m₂" unit="kg" min={0.5} max={3} step={0.1} value={m2} onChange={(v) => setSim("dp_m2", v)} />
+        <EqButton onClick={() => openEq({
+          title: "Double Pendulum",
+          formula: "Coupled nonlinear ODEs",
+          vars: [["θ₁", `${th1}°`], ["θ₂", `${th2}°`], ["L₁", `${L1} m`], ["L₂", `${L2} m`]],
+          steps: ["Lagrangian mechanics", "Two coupled second-order ODEs", "Chaotic for most initial conditions", "No closed-form solution"],
+          result: "Deterministic chaos",
+          note: "The double pendulum is one of the simplest physical systems that exhibits chaotic behavior.",
+        })} />
+      </ControlPanel>
+    </>
+  );
+}
+
+/* ================= Soft Body ================= */
+function SoftBodyUI() {
+  const sim = useStore((s) => s.sim);
+  const setSim = useStore((s) => s.setSim);
+  const bump = useStore((s) => s.bump);
+  const openEq = useStore((s) => s.openEq);
+  const k = Number(sim.sb_k ?? 500);
+  const damp = Number(sim.sb_damp ?? 2);
+  const g = Number(sim.sb_g ?? 9.81);
+
+  return (
+    <>
+      <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
+        <div className="pv-panel hud-corners relative h-full w-full overflow-hidden rounded-xl">
+          <canvas className="block h-full w-full" />
+          <div className="absolute left-3 top-3 text-[12px] text-[#39f0c3]">Soft Body Jelly</div>
+          <div className="absolute left-3 top-7 text-[10px] text-[#8fa3c8]">Mass-spring system • Deformable object</div>
+        </div>
+      </div>
+      <ControlPanel
+        title="Soft Body Controls" color={META.color}
+        footer={
+          <>
+            <Btn variant="primary" className="flex-1 !py-2 !text-[10px]" onClick={() => { bump("sb_run"); sfx.launch(); }}><Play size={12} /> Drop</Btn>
+          </>
+        }
+      >
+        <Slider label="Stiffness k" unit="N/m" min={100} max={2000} step={50} value={k} onChange={(v) => setSim("sb_k", v)} />
+        <Slider label="Damping" unit="" min={0} max={10} step={0.5} value={damp} onChange={(v) => setSim("sb_damp", v)} />
+        <Slider label="Gravity" unit="m/s²" min={0} max={20} step={0.5} value={g} onChange={(v) => setSim("sb_g", v)} />
+        <EqButton onClick={() => openEq({
+          title: "Mass-Spring System",
+          formula: "F = -k·Δx - c·v",
+          vars: [["k", `${k} N/m`], ["damping", `${damp}`], ["g", `${g} m/s²`]],
+          steps: ["Hooke's law for springs", "Damping for energy dissipation", "Newton's second law for each mass", "Numerical integration (Verlet)"],
+          result: "Deformable body dynamics",
+          note: "Soft body physics uses mass-spring systems to simulate deformable objects.",
+        })} />
+      </ControlPanel>
+    </>
+  );
+}
+
+/* ================= Resonance & TMD ================= */
+function ResonanceUI() {
+  const sim = useStore((s) => s.sim);
+  const setSim = useStore((s) => s.setSim);
+  const openEq = useStore((s) => s.openEq);
+  const f = Number(sim.rs_f ?? 5);
+  const f0 = Number(sim.rs_f0 ?? 5);
+  const zeta = Number(sim.rs_zeta ?? 0.05);
+
+  return (
+    <>
+      <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
+        <div className="pv-panel hud-corners relative h-full w-full overflow-hidden rounded-xl">
+          <canvas className="block h-full w-full" />
+          <div className="absolute left-3 top-3 text-[12px] text-[#ff7a9c]">Resonance & TMD</div>
+          <div className="absolute left-3 top-7 text-[10px] text-[#8fa3c8]">Tuned mass damper • Frequency response</div>
+        </div>
+      </div>
+      <ControlPanel
+        title="Resonance Controls" color={META.color}
+      >
+        <Slider label="Driving frequency" unit="Hz" min={0.1} max={20} step={0.1} value={f} onChange={(v) => setSim("rs_f", v)} />
+        <Slider label="Natural frequency" unit="Hz" min={0.1} max={20} step={0.1} value={f0} onChange={(v) => setSim("rs_f0", v)} />
+        <Slider label="Damping ratio ζ" unit="" min={0.01} max={1} step={0.01} value={zeta} onChange={(v) => setSim("rs_zeta", v)} />
+        <EqButton onClick={() => openEq({
+          title: "Resonance",
+          formula: "A(ω) = 1/√((1-r²)² + (2ζr)²)",
+          vars: [["f", `${f} Hz`], ["f₀", `${f0} Hz`], ["ζ", `${zeta}`]],
+          steps: ["r = f/f₀ (frequency ratio)", "Amplitude peaks at resonance", "Damping limits peak amplitude", "TMD adds secondary oscillator"],
+          result: "Resonant amplification",
+          note: "Resonance can cause structural failure. Tuned mass dampers (TMD) reduce vibration.",
+        })} />
+      </ControlPanel>
+    </>
+  );
+}
+
+/* ================= Stress-Strain FEA ================= */
+function FEAUI() {
+  const sim = useStore((s) => s.sim);
+  const setSim = useStore((s) => s.setSim);
+  const openEq = useStore((s) => s.openEq);
+  const E = Number(sim.fea_E ?? 2e11);
+  const strain = Number(sim.fea_strain ?? 0.001);
+
+  return (
+    <>
+      <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
+        <div className="pv-panel hud-corners relative h-full w-full overflow-hidden rounded-xl">
+          <canvas className="block h-full w-full" />
+          <div className="absolute left-3 top-3 text-[12px] text-[#ffb454]">Stress-Strain FEA</div>
+          <div className="absolute left-3 top-7 text-[10px] text-[#8fa3c8]">Finite element analysis • Material deformation</div>
+        </div>
+      </div>
+      <ControlPanel
+        title="FEA Controls" color={META.color}
+      >
+        <Slider label="Young's modulus" unit="GPa" min={50} max={300} step={10} value={E / 1e9} onChange={(v) => setSim("fea_E", v * 1e9)} />
+        <Slider label="Strain" unit="%" min={0} max={5} step={0.01} value={strain * 100} onChange={(v) => setSim("fea_strain", v / 100)} />
+        <EqButton onClick={() => openEq({
+          title: "Stress-Strain",
+          formula: "σ = E·ε (elastic region)",
+          vars: [["E", `${(E / 1e9).toFixed(0)} GPa`], ["ε", `${(strain * 100).toFixed(2)}%`]],
+          steps: ["Hooke's law in 1D", "Linear elastic region", "Yield point marks plastic deformation", "FEA discretizes complex geometries"],
+          result: "Material response",
+          note: "Finite element analysis solves complex stress distributions numerically.",
+        })} />
+      </ControlPanel>
+    </>
+  );
+}
+
 export default function MechanicsWorld() {
   const exp = useStore((s) => s.exp);
   const setExp = useStore((s) => s.setExp);
@@ -283,6 +447,10 @@ export default function MechanicsWorld() {
       {exp === "projectile" && <ProjectileUI />}
       {exp === "pendulum" && <PendulumUI />}
       {exp === "collision" && <CollisionUI />}
+      {exp === "doublepend" && <DoublePendulumUI />}
+      {exp === "softbody" && <SoftBodyUI />}
+      {exp === "resonance" && <ResonanceUI />}
+      {exp === "fea" && <FEAUI />}
     </div>
   );
 }

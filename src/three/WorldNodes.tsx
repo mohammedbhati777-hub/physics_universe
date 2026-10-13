@@ -294,6 +294,107 @@ function ModernVisual() {
   );
 }
 
+function AeroVisual() {
+  const wing = useRef<THREE.Mesh>(null);
+  useFrame((s) => {
+    const t = REDUCED_MOTION ? 0 : s.clock.elapsedTime;
+    if (wing.current) {
+      wing.current.rotation.z = Math.sin(t * 0.8) * 0.15;
+      wing.current.position.y = Math.sin(t * 1.2) * 0.1;
+    }
+  });
+  return (
+    <group>
+      <mesh ref={wing} rotation={[0, 0, 0.1]}>
+        <boxGeometry args={[2.2, 0.15, 0.8]} />
+        <meshStandardMaterial color="#4ecdc4" emissive="#1a5c56" emissiveIntensity={0.6} roughness={0.3} />
+      </mesh>
+      <mesh position={[0, -0.3, 0]} rotation={[0, 0, -0.2]}>
+        <boxGeometry args={[0.6, 0.08, 0.4]} />
+        <meshStandardMaterial color="#4ecdc4" emissive="#1a5c56" emissiveIntensity={0.4} roughness={0.4} />
+      </mesh>
+      {/* Flow lines */}
+      {[0, 1, 2].map((i) => (
+        <mesh key={i} position={[-1 + i * 0.5, 0.5 + i * 0.2, 0]} rotation={[0, 0, 0.3]}>
+          <cylinderGeometry args={[0.01, 0.01, 0.8, 6]} />
+          <meshBasicMaterial color="#4ecdc4" transparent opacity={0.4} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function EnergyVisual() {
+  const panel = useRef<THREE.Mesh>(null);
+  const sun = useRef<THREE.Mesh>(null);
+  useFrame((s) => {
+    const t = REDUCED_MOTION ? 0 : s.clock.elapsedTime;
+    if (panel.current) panel.current.rotation.y = Math.sin(t * 0.3) * 0.2;
+    if (sun.current) {
+      sun.current.position.x = Math.cos(t * 0.5) * 1.5;
+      sun.current.position.y = Math.sin(t * 0.5) * 0.8 + 0.5;
+    }
+  });
+  return (
+    <group>
+      <mesh ref={panel} position={[0, -0.3, 0]} rotation={[-0.3, 0, 0]}>
+        <boxGeometry args={[1.8, 0.05, 1.2]} />
+        <meshStandardMaterial color="#34495e" emissive="#1a252f" emissiveIntensity={0.5} roughness={0.2} metalness={0.8} />
+      </mesh>
+      {/* Grid lines on panel */}
+      {[0, 1, 2, 3].map((i) => (
+        <mesh key={i} position={[-0.6 + i * 0.4, -0.28, 0]} rotation={[-0.3, 0, 0]}>
+          <boxGeometry args={[0.02, 0.06, 1.2]} />
+          <meshBasicMaterial color="#f9ca24" transparent opacity={0.3} />
+        </mesh>
+      ))}
+      <mesh ref={sun} position={[1.5, 0.5, 0]}>
+        <sphereGeometry args={[0.25, 16, 16]} />
+        <meshBasicMaterial color="#f9ca24" />
+      </mesh>
+      <GlowSprite color="rgba(249,202,36,0.5)" scale={1.5} opacity={0.4} position={[1.5, 0.5, 0]} />
+    </group>
+  );
+}
+
+function ChaosVisual() {
+  const points = useRef<THREE.Points>(null);
+  const geo = useMemo(() => {
+    const n = 300;
+    const pos = new Float32Array(n * 3);
+    let x = 0.1, y = 0, z = 0;
+    const sigma = 10, rho = 28, beta = 2.667;
+    for (let i = 0; i < n; i++) {
+      const dt = 0.01;
+      const dx = sigma * (y - x);
+      const dy = x * (rho - z) - y;
+      const dz = x * y - beta * z;
+      x += dx * dt;
+      y += dy * dt;
+      z += dz * dt;
+      pos[i * 3] = x * 0.05;
+      pos[i * 3 + 1] = (z - 25) * 0.05;
+      pos[i * 3 + 2] = y * 0.05;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    return g;
+  }, []);
+  useFrame((s) => {
+    if (points.current && !REDUCED_MOTION) {
+      points.current.rotation.y = s.clock.elapsedTime * 0.2;
+    }
+  });
+  return (
+    <group>
+      <points ref={points} geometry={geo}>
+        <pointsMaterial color="#e056fd" size={0.04} transparent opacity={0.8} sizeAttenuation depthWrite={false} blending={THREE.AdditiveBlending} />
+      </points>
+      <mesh rotation={[1.1, 0, 0]}><torusGeometry args={[1.2, 0.008, 6, 56]} /><meshBasicMaterial color="#e056fd" transparent opacity={0.25} /></mesh>
+    </group>
+  );
+}
+
 const VISUALS: Record<string, () => JSX.Element> = {
   mechanics: MechanicsVisual,
   electricity: ElectricityVisual,
@@ -305,6 +406,9 @@ const VISUALS: Record<string, () => JSX.Element> = {
   thermo: ThermoVisual,
   fluids: FluidsVisual,
   modern: ModernVisual,
+  aero: AeroVisual,
+  energy: EnergyVisual,
+  chaos: ChaosVisual,
 };
 
 function WorldNode({ meta, faded }: { meta: WorldMeta; faded: boolean }) {

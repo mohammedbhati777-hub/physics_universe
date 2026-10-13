@@ -3,7 +3,7 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceD
 import { Plus, Minus, Trash2 } from "lucide-react";
 import { useStore, WORLDS, EqPayload } from "../store";
 import { WorldTabs, ControlPanel, Slider, Stat, Btn, EqButton, useCanvasLoop, CanvasFrame } from "../components/ui";
-import { Charge, eFieldAt, traceFieldLines, ohm, bWire, K_E, MU0, fmt, clamp } from "../physics";
+import { Charge, eFieldAt, traceFieldLines, ohm, bWire, K_E, MU0, fmt, clamp, pnJunction, mosfet } from "../physics";
 import { sfx } from "../sfx";
 
 const META = WORLDS.find((w) => w.id === "electricity")!;
@@ -470,6 +470,98 @@ function MagnetUI() {
   );
 }
 
+/* ================= PN Junction ================= */
+function PNJunctionUI() {
+  const sim = useStore((s) => s.sim);
+  const setSim = useStore((s) => s.setSim);
+  const openEq = useStore((s) => s.openEq);
+  const V = Number(sim.pn_V ?? 0.7);
+  const { I } = pnJunction(V);
+
+  return (
+    <>
+      <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
+        <CanvasFrame className="h-full w-full">
+          <div className="relative h-full w-full">
+            <canvas className="block h-full w-full" />
+            <div className="absolute left-3 top-3 text-[12px] text-[#f9ca24]">PN Junction Diode</div>
+            <div className="absolute left-3 top-7 text-[10px] text-[#8fa3c8]">Shockley equation • I-V characteristic</div>
+          </div>
+        </CanvasFrame>
+      </div>
+      <ControlPanel
+        title="Diode Controls" color={META.color}
+        footer={<EqButton onClick={() => openEq({
+          title: "PN Junction",
+          formula: "I = Iₛ·(e^(V/nVT) - 1)",
+          vars: [["V", `${V} V`], ["Iₛ", "1 pA"], ["n", "1.5"]],
+          steps: [
+            `VT = n·kT/q = 0.039 V (at 300K)`,
+            `I = 1e-12 × (e^(${V}/0.039) - 1)`,
+            `I = ${fmt(I * 1e3, 2)} mA`,
+          ],
+          result: `I = ${fmt(I * 1e3, 2)} mA`,
+          note: "Exponential I-V relationship. Forward bias: current flows. Reverse bias: blocks current.",
+        })} />}
+      >
+        <Slider label="Voltage" unit="V" min={-1} max={1} step={0.01} value={V} onChange={(v) => setSim("pn_V", v)} />
+        <div className="grid grid-cols-2 gap-1.5">
+          <Stat label="Current" value={fmt(I * 1e3, 2)} unit="mA" accent="#f9ca24" />
+        </div>
+      </ControlPanel>
+    </>
+  );
+}
+
+/* ================= MOSFET ================= */
+function MOSFETUI() {
+  const sim = useStore((s) => s.sim);
+  const setSim = useStore((s) => s.setSim);
+  const openEq = useStore((s) => s.openEq);
+  const Vgs = Number(sim.mf_Vgs ?? 2.5);
+  const Vth = Number(sim.mf_Vth ?? 1.5);
+  const Vds = Number(sim.mf_Vds ?? 2);
+  const { Id, region } = mosfet(Vgs, Vth, Vds);
+
+  return (
+    <>
+      <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
+        <CanvasFrame className="h-full w-full">
+          <div className="relative h-full w-full">
+            <canvas className="block h-full w-full" />
+            <div className="absolute left-3 top-3 text-[12px] text-[#00b894]">MOSFET Transistor</div>
+            <div className="absolute left-3 top-7 text-[10px] text-[#8fa3c8]">Inversion layer • Square law model</div>
+          </div>
+        </CanvasFrame>
+      </div>
+      <ControlPanel
+        title="MOSFET Controls" color={META.color}
+        footer={<EqButton onClick={() => openEq({
+          title: "MOSFET",
+          formula: "Id = kn·((Vgs-Vth)·Vds - Vds²/2) [linear]",
+          vars: [["Vgs", `${Vgs} V`], ["Vth", `${Vth} V`], ["Vds", `${Vds} V`]],
+          steps: [
+            region === "cutoff" ? "Vgs < Vth → cutoff (off)" :
+            region === "linear" ? `Linear region: Id = kn·((Vgs-Vth)·Vds - Vds²/2)` :
+            `Saturation: Id = (kn/2)·(Vgs-Vth)²`,
+            `Id = ${fmt(Id * 1e3, 2)} mA`,
+          ],
+          result: `Id = ${fmt(Id * 1e3, 2)} mA    Region: ${region}`,
+          note: "MOSFET is the building block of modern electronics. Gate voltage controls channel conductivity.",
+        })} />}
+      >
+        <Slider label="Vgs (gate-source)" unit="V" min={0} max={5} step={0.1} value={Vgs} onChange={(v) => setSim("mf_Vgs", v)} />
+        <Slider label="Vth (threshold)" unit="V" min={0.5} max={3} step={0.1} value={Vth} onChange={(v) => setSim("mf_Vth", v)} />
+        <Slider label="Vds (drain-source)" unit="V" min={0} max={5} step={0.1} value={Vds} onChange={(v) => setSim("mf_Vds", v)} />
+        <div className="grid grid-cols-2 gap-1.5">
+          <Stat label="Drain current" value={fmt(Id * 1e3, 2)} unit="mA" accent="#00b894" />
+          <Stat label="Region" value={region} unit="" />
+        </div>
+      </ControlPanel>
+    </>
+  );
+}
+
 export default function ElectricityWorld() {
   const exp = useStore((s) => s.exp);
   const setExp = useStore((s) => s.setExp);
@@ -479,6 +571,8 @@ export default function ElectricityWorld() {
       {exp === "field" && <FieldUI />}
       {exp === "ohm" && <OhmUI />}
       {exp === "magnet" && <MagnetUI />}
+      {exp === "pnjunction" && <PNJunctionUI />}
+      {exp === "mosfet" && <MOSFETUI />}
     </div>
   );
 }

@@ -389,3 +389,170 @@ export function fissionEnergy(grams: number) {
   return { EJ, kWh: EJ / 3.6e6, tnt: EJ / 4.184e9 }; // tons of TNT equivalent
 }
 
+/* ================= ADVANCED SIMULATIONS ================= */
+
+/* Schrödinger equation (1D, time-independent, infinite well) */
+export function schrodinger1D(n: number, L: number, x: number) {
+  n = clamp(Math.round(n), 1, 10);
+  L = clamp(L, 1, 10);
+  x = clamp(x, 0, L);
+  const psi = Math.sqrt(2 / L) * Math.sin((n * Math.PI * x) / L);
+  const E = (n * n * Math.PI * Math.PI * HBAR * HBAR) / (2 * M_ELECTRON * L * L * 1e-18); // eV
+  return { psi, prob: psi * psi, E };
+}
+
+/* Lorenz attractor */
+export interface LorenzState { x: number; y: number; z: number }
+export function lorenzStep(s: LorenzState, sigma: number, rho: number, beta: number, dt: number): LorenzState {
+  const dx = sigma * (s.y - s.x);
+  const dy = s.x * (rho - s.z) - s.y;
+  const dz = s.x * s.y - beta * s.z;
+  return { x: s.x + dx * dt, y: s.y + dy * dt, z: s.z + dz * dt };
+}
+
+/* Double pendulum */
+export interface DoublePendState { th1: number; th2: number; om1: number; om2: number }
+export function doublePendStep(s: DoublePendState, L1: number, L2: number, m1: number, m2: number, g: number, dt: number): DoublePendState {
+  const { th1, th2, om1, om2 } = s;
+  const dth = th1 - th2;
+  const den = 2 * m1 + m2 - m2 * Math.cos(2 * dth);
+  const a1 = (-g * (2 * m1 + m2) * Math.sin(th1) - m2 * g * Math.sin(th1 - 2 * th2) - 2 * Math.sin(dth) * m2 * (om2 * om2 * L2 + om1 * om1 * L1 * Math.cos(dth))) / (L1 * den);
+  const a2 = (2 * Math.sin(dth) * (om1 * om1 * L1 * (m1 + m2) + g * (m1 + m2) * Math.cos(th1) + om2 * om2 * L2 * m2 * Math.cos(dth))) / (L2 * den);
+  return { th1: th1 + om1 * dt, th2: th2 + om2 * dt, om1: om1 + a1 * dt, om2: om2 + a2 * dt };
+}
+
+/* Airfoil (thin airfoil theory, NACA 4-digit) */
+export function airfoilLift(alpha: number, c: number, v: number, rho = 1.225) {
+  alpha = clamp(alpha, -15, 15);
+  const aRad = (alpha * Math.PI) / 180;
+  const CL = 2 * Math.PI * aRad; // thin airfoil theory
+  const L = 0.5 * rho * v * v * c * CL;
+  const CD = 0.006 + 0.04 * (aRad * aRad); // parasitic + induced
+  const D = 0.5 * rho * v * v * c * CD;
+  return { CL, CD, L, D, L_D: D > 0 ? L / D : 0 };
+}
+
+/* Solar cell (single diode model) */
+export function solarCell(irradiance: number, temp: number, shading: number) {
+  irradiance = clamp(irradiance, 0, 1200);
+  temp = clamp(temp, -20, 80);
+  shading = clamp(shading, 0, 1);
+  const Iph = (irradiance / 1000) * 9; // A, reference 9A at 1000 W/m²
+  const I0 = 1e-10; // reverse saturation
+  const n = 1.3; // ideality factor
+  const VT = (n * 1.38e-23 * (temp + 273.15)) / 1.6e-19; // thermal voltage
+  const Voc = VT * Math.log(Iph / I0 + 1);
+  const Isc = Iph * (1 - shading * 0.8);
+  const Pmax = Isc * Voc * 0.75; // fill factor ~0.75
+  const eff = (Pmax / (irradiance * 0.01)) * 100; // % efficiency
+  return { Voc, Isc, Pmax, eff };
+}
+
+/* Grid frequency */
+export function gridFrequency(load: number, gen: number, inertia: number, dt: number, f0 = 50) {
+  load = clamp(load, 100, 2000);
+  gen = clamp(gen, 100, 2000);
+  const P = gen - load; // MW imbalance
+  const df = (P / (2 * inertia * 50)) * dt; // Hz change
+  return { f: f0 + df, P, df };
+}
+
+/* PN junction */
+export function pnJunction(V: number, Is = 1e-12, n = 1.5, T = 300) {
+  V = clamp(V, -1, 1);
+  const VT = (n * 1.38e-23 * T) / 1.6e-19;
+  const I = Is * (Math.exp(V / VT) - 1);
+  return { I, V, VT };
+}
+
+/* MOSFET (simple square law) */
+export function mosfet(Vgs: number, Vth: number, Vds: number, kn = 0.001) {
+  Vgs = clamp(Vgs, 0, 5);
+  Vds = clamp(Vds, 0, 5);
+  Vth = clamp(Vth, 0.5, 3);
+  if (Vgs < Vth) return { Id: 0, region: "cutoff" };
+  if (Vds < Vgs - Vth) return { Id: kn * ((Vgs - Vth) * Vds - Vds * Vds / 2), region: "linear" };
+  return { Id: (kn / 2) * (Vgs - Vth) * (Vgs - Vth), region: "saturation" };
+}
+
+/* Resonance / TMD */
+export function resonance(freq: number, f0: number, zeta: number) {
+  const r = freq / Math.max(0.01, f0);
+  const amp = 1 / Math.sqrt((1 - r * r) ** 2 + (2 * zeta * r) ** 2);
+  return { amp, r };
+}
+
+/* Stress-strain (linear elastic) */
+export function stressStrain(E: number, strain: number, yieldStrain = 0.002) {
+  E = clamp(E, 1e9, 1e12); // Pa
+  strain = clamp(strain, 0, 0.05);
+  const stress = strain < yieldStrain ? E * strain : E * yieldStrain; // elastic-perfectly plastic
+  return { stress, strain, elastic: strain < yieldStrain };
+}
+
+/* Sonic boom */
+export function sonicBoom(v: number, vs = 343) {
+  v = clamp(v, 0, 1000);
+  const M = v / vs;
+  const theta = M > 1 ? Math.asin(1 / M) : NaN;
+  return { M, theta: isNaN(theta) ? NaN : (theta * 180) / Math.PI };
+}
+
+/* Reverberation time (Sabine) */
+export function reverbTime(V: number, A: number) {
+  V = clamp(V, 10, 10000);
+  A = clamp(A, 1, 5000);
+  return (0.161 * V) / A; // seconds
+}
+
+/* Stirling engine */
+export function stirlingEngine(Th: number, Tc: number, Vmax: number, Vmin: number, n = 1, R = 8.314) {
+  Th = clamp(Th, 300, 1500);
+  Tc = clamp(Tc, 200, Th - 50);
+  const W = n * R * (Th - Tc) * Math.log(Vmax / Vmin);
+  const Qh = n * R * Th * Math.log(Vmax / Vmin);
+  return { W, Qh, eff: W / Qh };
+}
+
+/* Lagrangian points (circular restricted 3-body) */
+export function lagrangianPoints(M1: number, M2: number, R: number) {
+  const mu = M2 / (M1 + M2);
+  const L1 = R * (1 - Math.pow(mu / 3, 1 / 3));
+  const L2 = R * (1 + Math.pow(mu / 3, 1 / 3));
+  const L3 = -R * (1 + (5 / 12) * mu);
+  const L4 = [R * 0.5, (R * Math.sqrt(3)) / 2] as [number, number];
+  const L5 = [R * 0.5, -(R * Math.sqrt(3)) / 2] as [number, number];
+  return { L1, L2, L3, L4, L5 };
+}
+
+/* Non-Newtonian fluid (Bingham plastic) */
+export function nonNewtonian(tau: number, tauY: number, mu: number) {
+  tau = clamp(tau, 0, 1000);
+  tauY = clamp(tauY, 0, 500);
+  mu = clamp(mu, 0.01, 10);
+  if (tau < tauY) return { gamma: 0, viscous: false };
+  return { gamma: (tau - tauY) / mu, viscous: true };
+}
+
+/* Soft body (mass-spring, 2D) */
+export interface SoftBodyNode { x: number; y: number; vx: number; vy: number; m: number }
+export function softBodyStep(nodes: SoftBodyNode[], springs: [number, number, number][], k: number, damp: number, g: number, dt: number) {
+  const forces = nodes.map(() => ({ fx: 0, fy: nodes[0].m * g }));
+  for (const [i, j, L0] of springs) {
+    const dx = nodes[j].x - nodes[i].x;
+    const dy = nodes[j].y - nodes[i].y;
+    const L = Math.hypot(dx, dy) || 1e-6;
+    const F = k * (L - L0);
+    const fx = (F * dx) / L;
+    const fy = (F * dy) / L;
+    forces[i].fx += fx; forces[i].fy += fy;
+    forces[j].fx -= fx; forces[j].fy -= fy;
+  }
+  for (let i = 0; i < nodes.length; i++) {
+    nodes[i].vx += (forces[i].fx / nodes[i].m - damp * nodes[i].vx) * dt;
+    nodes[i].vy += (forces[i].fy / nodes[i].m - damp * nodes[i].vy) * dt;
+    nodes[i].x += nodes[i].vx * dt;
+    nodes[i].y += nodes[i].vy * dt;
+  }
+}
+
