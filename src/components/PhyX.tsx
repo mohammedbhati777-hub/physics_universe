@@ -152,7 +152,7 @@ export default function PhyX() {
       <button
         onClick={() => { setPanel("phyxOpen", !open); sfx.tick(); }}
         aria-label="Toggle PHY-X assistant"
-        className="pv-hud-btn fixed bottom-4 right-4 z-40 !px-3 !py-2.5"
+        className="pv-hud-btn fixed bottom-4 left-4 z-40 !px-3 !py-2.5"
         style={open ? { borderColor: "rgba(83,232,255,0.6)", color: "#53e8ff" } : undefined}
       >
         <Bot size={15} className="text-[#53e8ff]" />
@@ -162,9 +162,9 @@ export default function PhyX() {
       <AnimatePresence>
         {open ? (
           <motion.div
-            key="phyx" initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 30, opacity: 0 }}
+            key="phyx" initial={{ x: -30, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -30, opacity: 0 }}
             transition={{ type: "spring", stiffness: 280, damping: 28 }}
-            className="pv-panel-solid absolute bottom-20 right-4 z-40 flex h-[26rem] w-[22rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl"
+            className="pv-panel-solid absolute bottom-20 left-4 z-40 flex h-[26rem] w-[22rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl"
             role="dialog" aria-label="PHY-X assistant"
           >
             <div className="flex items-center justify-between border-b border-[rgba(96,145,255,0.12)] px-4 py-2.5">
