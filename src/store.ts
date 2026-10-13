@@ -3,7 +3,7 @@ import { narrate, cancelVoice } from "./voice";
 import { bed, braam, shimmer } from "./sfx";
 
 export type Phase = "landing" | "universe" | "world";
-export type WorldId = "mechanics" | "electricity" | "waves" | "optics" | "space" | "quantum" | "gravity" | "thermo" | "fluids" | "modern";
+export type WorldId = "mechanics" | "electricity" | "waves" | "optics" | "space" | "quantum" | "gravity" | "thermo" | "fluids" | "modern" | "aero" | "energy" | "chaos";
 export type V3 = [number, number, number];
 
 export interface WorldMeta {
@@ -37,6 +37,10 @@ export const WORLDS: WorldMeta[] = [
       { id: "projectile", name: "Projectile Motion" },
       { id: "pendulum", name: "Pendulum Lab" },
       { id: "collision", name: "Collision Lab" },
+      { id: "doublepend", name: "Double Pendulum" },
+      { id: "softbody", name: "Soft Body Jelly" },
+      { id: "resonance", name: "Resonance & TMD" },
+      { id: "fea", name: "Stress-Strain FEA" },
     ],
   },
   {
@@ -47,6 +51,8 @@ export const WORLDS: WorldMeta[] = [
       { id: "field", name: "Electric Field" },
       { id: "ohm", name: "Ohm's Law Lab" },
       { id: "magnet", name: "Magnetic Field" },
+      { id: "pnjunction", name: "PN Junction Diode" },
+      { id: "mosfet", name: "MOSFET Transistor" },
     ],
   },
   {
@@ -57,6 +63,8 @@ export const WORLDS: WorldMeta[] = [
       { id: "wave", name: "Wave Tank" },
       { id: "interference", name: "Interference" },
       { id: "doppler", name: "Doppler Effect" },
+      { id: "sonicboom", name: "Sonic Boom" },
+      { id: "acoustics", name: "Room Acoustics" },
     ],
   },
   {
@@ -79,6 +87,7 @@ export const WORLDS: WorldMeta[] = [
       { id: "escape", name: "Escape Velocity" },
       { id: "blackhole", name: "Black Hole" },
       { id: "binary", name: "Binary Stars" },
+      { id: "lagrange", name: "Lagrangian Points" },
     ],
   },
   {
@@ -88,6 +97,7 @@ export const WORLDS: WorldMeta[] = [
     experiments: [
       { id: "doubleslit", name: "Double-Slit" },
       { id: "tunneling", name: "Tunneling" },
+      { id: "schrodinger", name: "Schrödinger Solver" },
     ],
   },
   {
@@ -108,6 +118,7 @@ export const WORLDS: WorldMeta[] = [
       { id: "gas", name: "Ideal Gas Law" },
       { id: "carnot", name: "Carnot Engine" },
       { id: "cooling", name: "Newton's Cooling" },
+      { id: "stirling", name: "Stirling Engine" },
     ],
   },
   {
@@ -118,6 +129,7 @@ export const WORLDS: WorldMeta[] = [
       { id: "buoyancy", name: "Buoyancy Lab" },
       { id: "venturi", name: "Venturi Flow" },
       { id: "hydraulic", name: "Hydraulic Press" },
+      { id: "nonnewtonian", name: "Non-Newtonian Fluid" },
     ],
   },
   {
@@ -128,6 +140,32 @@ export const WORLDS: WorldMeta[] = [
       { id: "dilation", name: "Time Dilation" },
       { id: "photoelectric", name: "Photoelectric Effect" },
       { id: "fission", name: "E = mc² Fission" },
+      { id: "relativity", name: "Special Relativity" },
+    ],
+  },
+  {
+    id: "aero", name: "AERODYNAMICS", tag: "Lift • Drag • Flow", color: "#4ecdc4",
+    desc: "Shape the air. Feel the lift. Watch the flow separate and reattach in real time.",
+    pos: node(10, 1.2), cam: FLAT_CAM,
+    experiments: [
+      { id: "airfoil", name: "Airfoil Wind Tunnel" },
+    ],
+  },
+  {
+    id: "energy", name: "ENERGY", tag: "Solar • Grid • Power", color: "#f9ca24",
+    desc: "From photons to power lines — efficiency, shading, and grid stability in one place.",
+    pos: node(11, -0.8), cam: FLAT_CAM,
+    experiments: [
+      { id: "solar", name: "Solar Cell PV" },
+      { id: "grid", name: "Grid Frequency" },
+    ],
+  },
+  {
+    id: "chaos", name: "CHAOS", tag: "Strange • Attractors • Fractals", color: "#e056fd",
+    desc: "Deterministic yet unpredictable — watch chaos emerge from simple equations.",
+    pos: node(12, 1.6), cam: FLAT_CAM,
+    experiments: [
+      { id: "lorenz", name: "Lorenz Attractor" },
     ],
   },
 ];
@@ -144,19 +182,25 @@ const VOICE_LINES: Record<WorldId, string> = {
   thermo: "Heat is motion… made visible.",
   fluids: "The silent power… of flow.",
   modern: "Where time itself… begins to bend.",
+  aero: "Shape the air… and feel the lift.",
+  energy: "From photons… to the power grid.",
+  chaos: "Where order… dissolves into beauty.",
 };
 
 export const DEFAULTS: Record<WorldId, Record<string, number | boolean>> = {
-  mechanics: { pj_v0: 22, pj_ang: 55, pj_g: 9.81, pj_h0: 1.5, pj_drag: false, pj_run: 1, pn_L: 2.5, pn_m: 1.5, pn_g: 9.81, pn_th: 45, pn_run: 1, cl_mA: 2, cl_mB: 3, cl_vA: 4, cl_vB: -2, cl_el: true, cl_run: 1 },
-  electricity: { ef_q: 3, ohm_V: 9, ohm_R: 15, mag_I: 5, mag_r: 4 },
-  waves: { wv_A: 0.5, wv_f: 1.4, wv_l: 2.2, wv_ph: 0, if_d: 2.4, if_f: 1.4, if_ph: 0, dp_vs: 60, dp_vo: 0, dp_f: 800 },
+  mechanics: { pj_v0: 22, pj_ang: 55, pj_g: 9.81, pj_h0: 1.5, pj_drag: false, pj_run: 1, pn_L: 2.5, pn_m: 1.5, pn_g: 9.81, pn_th: 45, pn_run: 1, cl_mA: 2, cl_mB: 3, cl_vA: 4, cl_vB: -2, cl_el: true, cl_run: 1, dp_th1: 120, dp_th2: 120, dp_L1: 1, dp_L2: 1, dp_m1: 1, dp_m2: 1, dp_run: 1, sb_k: 500, sb_damp: 2, sb_g: 9.81, sb_run: 1, rs_f: 5, rs_f0: 5, rs_zeta: 0.05, fea_E: 2e11, fea_strain: 0.001 },
+  electricity: { ef_q: 3, ohm_V: 9, ohm_R: 15, mag_I: 5, mag_r: 4, pn_V: 0.7, pn_Is: 1e-12, mf_Vgs: 2.5, mf_Vth: 1.5, mf_Vds: 2 },
+  waves: { wv_A: 0.5, wv_f: 1.4, wv_l: 2.2, wv_ph: 0, if_d: 2.4, if_f: 1.4, if_ph: 0, dp_vs: 60, dp_vo: 0, dp_f: 800, sb_v: 400, ac_V: 500, ac_A: 100 },
   optics: { rf_th: 40, rr_n1: 1.0, rr_n2: 1.5, rr_th: 45, ln_convex: true, ln_f: 12, ln_u: 30 },
-  space: { gr_m: 2, gr_d: 10, st_alt: 400, st_v: 7.67, st_run: 1, es_v: 11.2, es_run: 1, bh_m: 10, bn_m1: 4, bn_m2: 1, bn_a: 6 },
-  quantum: { ds_l: 550, ds_d: 2.5, ds_wave: false, ds_run: 1, tn_E: 0.6, tn_V0: 1.2, tn_a: 1.0 },
+  space: { gr_m: 2, gr_d: 10, st_alt: 400, st_v: 7.67, st_run: 1, es_v: 11.2, es_run: 1, bh_m: 10, bn_m1: 4, bn_m2: 1, bn_a: 6, lg_M1: 1, lg_M2: 0.001, lg_R: 1 },
+  quantum: { ds_l: 550, ds_d: 2.5, ds_wave: false, ds_run: 1, tn_E: 0.6, tn_V0: 1.2, tn_a: 1.0, sch_n: 1, sch_L: 2, sch_x: 1 },
   gravity: { wt_m: 10, wt_p: 2, ff_h: 120, ff_g: 9.81, ff_vt: 42, ff_run: 1, cv_m1: 800, cv_m2: 800, cv_r: 0.5 },
-  thermo: { gas_T: 300, gas_V: 12, gas_n: 1, cn_Th: 600, cn_Tc: 300, cl_T0: 90, cl_Tenv: 22, cl_k: 0.06 },
-  fluids: { bu_rho: 650, bu_fluid: 1000, vn_v1: 4, vn_ratio: 2.2, hy_F: 120, hy_ratio: 30 },
+  thermo: { gas_T: 300, gas_V: 12, gas_n: 1, cn_Th: 600, cn_Tc: 300, cl_T0: 90, cl_Tenv: 22, cl_k: 0.06, st_Th: 800, st_Tc: 300, st_Vmax: 2, st_Vmin: 1 },
+  fluids: { bu_rho: 650, bu_fluid: 1000, vn_v1: 4, vn_ratio: 2.2, hy_F: 120, hy_ratio: 30, nn_tau: 100, nn_tauY: 50, nn_mu: 1 },
   modern: { td_v: 0.6, pe_f: 700, pe_I: 60, pe_metal: 0, fs_g: 1, fs_run: 1 },
+  aero: { af_alpha: 5, af_v: 50, af_c: 1, af_rho: 1.225 },
+  energy: { sc_irr: 1000, sc_temp: 25, sc_shade: 0, gf_load: 500, gf_gen: 500, gf_inertia: 5 },
+  chaos: { lz_sigma: 10, lz_rho: 28, lz_beta: 2.667, lz_dt: 0.01 },
 };
 
 export interface EqPayload {

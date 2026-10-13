@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { Rocket, RotateCcw } from "lucide-react";
 import { useStore, WORLDS } from "../store";
-import { WorldTabs, ControlPanel, Slider, Stat, Btn, EqButton } from "../components/ui";
-import { G, C_LIGHT, M_EARTH, R_EARTH, gravityForce, orbitPath, circularOrbit, escapePath, binaryPeriod, fmt } from "../physics";
+import { WorldTabs, ControlPanel, Slider, Stat, Btn, EqButton, useCanvasLoop, CanvasFrame } from "../components/ui";
+import { G, C_LIGHT, M_EARTH, R_EARTH, gravityForce, orbitPath, circularOrbit, escapePath, binaryPeriod, lagrangianPoints, fmt } from "../physics";
 import { sfx } from "../sfx";
 
 const META = WORLDS.find((w) => w.id === "space")!;
@@ -272,6 +272,144 @@ function BinaryUI() {
   );
 }
 
+/* ================= Lagrangian Points ================= */
+function LagrangianCanvas() {
+  const ref = useCanvasLoop((ctx, w, h, t) => {
+    const sim = useStore.getState().sim;
+    const M1 = Number(sim.lg_M1 ?? 1);
+    const M2 = Number(sim.lg_M2 ?? 0.001);
+    const R = Number(sim.lg_R ?? 1);
+    const lp = lagrangianPoints(M1, M2, R);
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#0a0e1a";
+    ctx.fillRect(0, 0, w, h);
+
+    const cx = w / 2;
+    const cy = h / 2;
+    const scale = Math.min(w, h) * 0.3;
+
+    // Draw orbit
+    ctx.strokeStyle = "rgba(122, 184, 255, 0.3)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * scale, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Primary body (M1)
+    ctx.fillStyle = "#ffb454";
+    ctx.beginPath();
+    ctx.arc(cx - R * scale * 0.5, cy, 20, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 12px 'IBM Plex Mono'";
+    ctx.textAlign = "center";
+    ctx.fillText("M₁", cx - R * scale * 0.5, cy + 4);
+
+    // Secondary body (M2)
+    ctx.fillStyle = "#53e8ff";
+    ctx.beginPath();
+    ctx.arc(cx + R * scale * 0.5, cy, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.fillText("M₂", cx + R * scale * 0.5, cy + 4);
+
+    // Lagrangian points
+    const points = [
+      { x: lp.L1, y: 0, label: "L1", color: "#39f0c3" },
+      { x: lp.L2, y: 0, label: "L2", color: "#ff7a9c" },
+      { x: lp.L3, y: 0, label: "L3", color: "#ffb454" },
+      { x: lp.L4[0], y: lp.L4[1], label: "L4", color: "#a29bfe" },
+      { x: lp.L5[0], y: lp.L5[1], label: "L5", color: "#fd79a8" },
+    ];
+
+    points.forEach((p) => {
+      const px = cx + p.x * scale;
+      const py = cy - p.y * scale;
+      
+      // Pulsing effect
+      const pulse = 1 + Math.sin(t * 3) * 0.2;
+      
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = 0.3;
+      ctx.beginPath();
+      ctx.arc(px, py, 12 * pulse, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(px, py, 6, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 11px 'IBM Plex Mono'";
+      ctx.fillText(p.label, px, py - 15);
+    });
+
+    // Labels
+    ctx.fillStyle = "#7ab8ff";
+    ctx.font = "bold 14px 'IBM Plex Mono'";
+    ctx.textAlign = "left";
+    ctx.fillText("Lagrangian Points", 20, 30);
+    ctx.fillStyle = "#8fa3c8";
+    ctx.font = "11px 'IBM Plex Mono'";
+    ctx.fillText("5 equilibrium points in the 3-body problem", 20, 48);
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "12px 'IBM Plex Mono'";
+    ctx.fillText(`L1 = ${fmt(lp.L1, 3)} AU`, 20, h * 0.85);
+    ctx.fillText(`L2 = ${fmt(lp.L2, 3)} AU`, 20, h * 0.85 + 20);
+  });
+  return <canvas ref={ref} className="block h-full w-full" />;
+}
+
+function LagrangianUI() {
+  const sim = useStore((s) => s.sim);
+  const setSim = useStore((s) => s.setSim);
+  const openEq = useStore((s) => s.openEq);
+  const M1 = Number(sim.lg_M1 ?? 1);
+  const M2 = Number(sim.lg_M2 ?? 0.001);
+  const R = Number(sim.lg_R ?? 1);
+  const lp = lagrangianPoints(M1, M2, R);
+
+  return (
+    <>
+      <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
+        <CanvasFrame className="h-full w-full"><LagrangianCanvas /></CanvasFrame>
+      </div>
+      <ControlPanel
+        title="Lagrangian Controls" color={META.color}
+        footer={<EqButton onClick={() => openEq({
+          title: "Lagrangian Points",
+          formula: "L1, L2, L3: collinear    L4, L5: triangular",
+          vars: [["M₁", `${M1} M☉`], ["M₂", `${M2} M☉`], ["R", `${R} AU`]],
+          steps: [
+            "5 points where gravitational + centrifugal forces balance",
+            "L1, L2, L3: unstable equilibrium (collinear)",
+            "L4, L5: stable equilibrium (60° ahead/behind)",
+            "Used for space telescopes (JWST at L2)",
+          ],
+          result: `L1 = ${fmt(lp.L1, 3)} AU    L2 = ${fmt(lp.L2, 3)} AU`,
+          note: "L4 and L5 form equilateral triangles with the two masses. Trojan asteroids orbit at Jupiter's L4/L5.",
+        })} />}
+      >
+        <Slider label="Primary mass M₁" unit="M☉" min={0.1} max={10} step={0.1} value={M1} onChange={(v) => setSim("lg_M1", v)} />
+        <Slider label="Secondary mass M₂" unit="M☉" min={0.0001} max={1} step={0.001} value={M2} onChange={(v) => setSim("lg_M2", v)} />
+        <Slider label="Separation R" unit="AU" min={0.1} max={5} step={0.1} value={R} onChange={(v) => setSim("lg_R", v)} />
+        <div className="grid grid-cols-2 gap-1.5">
+          <Stat label="L1 distance" value={fmt(lp.L1, 3)} unit="AU" accent="#39f0c3" />
+          <Stat label="L2 distance" value={fmt(lp.L2, 3)} unit="AU" accent="#ff7a9c" />
+          <Stat label="L3 distance" value={fmt(Math.abs(lp.L3), 3)} unit="AU" accent="#ffb454" />
+          <Stat label="Mass ratio μ" value={fmt(M2 / (M1 + M2), 4)} unit="" />
+        </div>
+      </ControlPanel>
+    </>
+  );
+}
+
 export default function SpaceWorld() {
   const exp = useStore((s) => s.exp);
   const setExp = useStore((s) => s.setExp);
@@ -283,6 +421,7 @@ export default function SpaceWorld() {
       {exp === "escape" && <EscapeUI />}
       {exp === "blackhole" && <BlackholeUI />}
       {exp === "binary" && <BinaryUI />}
+      {exp === "lagrange" && <LagrangianUI />}
     </div>
   );
 }

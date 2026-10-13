@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { useStore, WORLDS } from "../store";
 import { WorldTabs, ControlPanel, Slider, Stat, EqButton, useCanvasLoop, CanvasFrame } from "../components/ui";
-import { waveY, waveSpeed, dopplerShift, V_SOUND, fmt, clamp } from "../physics";
+import { waveY, waveSpeed, dopplerShift, V_SOUND, fmt, clamp, sonicBoom, reverbTime } from "../physics";
 
 const META = WORLDS.find((w) => w.id === "waves")!;
 
@@ -328,6 +328,227 @@ function DopplerUI() {
   );
 }
 
+/* ================= Sonic Boom ================= */
+function SonicBoomCanvas() {
+  const ref = useCanvasLoop((ctx, w, h, t) => {
+    const sim = useStore.getState().sim;
+    const v = Number(sim.sb_v ?? 400);
+    const { M, theta } = sonicBoom(v);
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#0a0e1a";
+    ctx.fillRect(0, 0, w, h);
+
+    // Draw aircraft
+    const aircraftX = w * 0.3 + (t * 50) % (w * 0.5);
+    const aircraftY = h * 0.4;
+
+    // Mach cone (if supersonic)
+    if (M > 1 && !isNaN(theta)) {
+      const thetaRad = (theta * Math.PI) / 180;
+      const coneLength = w * 0.6;
+      
+      ctx.strokeStyle = "rgba(255, 107, 107, 0.4)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(aircraftX, aircraftY);
+      ctx.lineTo(aircraftX - coneLength * Math.cos(thetaRad), aircraftY - coneLength * Math.sin(thetaRad));
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(aircraftX, aircraftY);
+      ctx.lineTo(aircraftX - coneLength * Math.cos(thetaRad), aircraftY + coneLength * Math.sin(thetaRad));
+      ctx.stroke();
+
+      // Fill cone
+      ctx.fillStyle = "rgba(255, 107, 107, 0.1)";
+      ctx.beginPath();
+      ctx.moveTo(aircraftX, aircraftY);
+      ctx.lineTo(aircraftX - coneLength * Math.cos(thetaRad), aircraftY - coneLength * Math.sin(thetaRad));
+      ctx.lineTo(aircraftX - coneLength * Math.cos(thetaRad), aircraftY + coneLength * Math.sin(thetaRad));
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Aircraft
+    ctx.fillStyle = "#ff6b6b";
+    ctx.beginPath();
+    ctx.moveTo(aircraftX + 20, aircraftY);
+    ctx.lineTo(aircraftX - 10, aircraftY - 8);
+    ctx.lineTo(aircraftX - 10, aircraftY + 8);
+    ctx.closePath();
+    ctx.fill();
+
+    // Shock wave rings (if supersonic)
+    if (M > 1) {
+      for (let i = 0; i < 5; i++) {
+        const ringX = aircraftX - i * 80;
+        const ringRadius = i * 40;
+        ctx.strokeStyle = `rgba(255, 107, 107, ${0.3 - i * 0.05})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(ringX, aircraftY, ringRadius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    // Labels
+    ctx.fillStyle = "#ff6b6b";
+    ctx.font = "bold 14px 'IBM Plex Mono'";
+    ctx.fillText("Sonic Boom", 20, 30);
+    ctx.fillStyle = "#8fa3c8";
+    ctx.font = "11px 'IBM Plex Mono'";
+    ctx.fillText("Mach cone • Shock wave formation", 20, 48);
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "12px 'IBM Plex Mono'";
+    ctx.fillText(`Mach ${M.toFixed(2)}`, 20, h * 0.75);
+    if (M > 1 && !isNaN(theta)) {
+      ctx.fillText(`Cone angle: ${theta.toFixed(1)}°`, 20, h * 0.75 + 20);
+    }
+  });
+  return <canvas ref={ref} className="block h-full w-full" />;
+}
+
+function SonicBoomUI() {
+  const sim = useStore((s) => s.sim);
+  const setSim = useStore((s) => s.setSim);
+  const openEq = useStore((s) => s.openEq);
+  const v = Number(sim.sb_v ?? 400);
+  const { M, theta } = sonicBoom(v);
+
+  return (
+    <>
+      <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
+        <CanvasFrame className="h-full w-full"><SonicBoomCanvas /></CanvasFrame>
+      </div>
+      <ControlPanel
+        title="Sonic Boom Controls" color={META.color}
+        footer={<EqButton onClick={() => openEq({
+          title: "Sonic Boom",
+          formula: "sin(θ) = 1/M    M = v/vₛ",
+          vars: [["v", `${v} m/s`], ["vₛ", `${V_SOUND} m/s`]],
+          steps: [
+            `M = ${v} / ${V_SOUND} = ${fmt(M, 2)}`,
+            M > 1 ? `θ = arcsin(1/${fmt(M, 2)}) = ${fmt(theta, 1)}°` : "Subsonic — no shock wave",
+          ],
+          result: M > 1 ? `M = ${fmt(M, 2)}    θ = ${fmt(theta, 1)}°` : `M = ${fmt(M, 2)} (subsonic)`,
+          note: "Supersonic objects create a Mach cone. The boom is heard when the cone passes the observer.",
+        })} />}
+      >
+        <Slider label="Velocity" unit="m/s" min={100} max={1000} step={10} value={v} onChange={(x) => setSim("sb_v", x)} />
+        <div className="grid grid-cols-2 gap-1.5">
+          <Stat label="Mach number" value={fmt(M, 2)} unit="" accent={M > 1 ? "#ff6b6b" : "#39f0c3"} />
+          <Stat label="Cone angle" value={M > 1 ? fmt(theta, 1) : "—"} unit={M > 1 ? "°" : ""} />
+        </div>
+      </ControlPanel>
+    </>
+  );
+}
+
+/* ================= Room Acoustics ================= */
+function AcousticsCanvas() {
+  const ref = useCanvasLoop((ctx, w, h, t) => {
+    const sim = useStore.getState().sim;
+    const V = Number(sim.ac_V ?? 500);
+    const A = Number(sim.ac_A ?? 100);
+    const T = reverbTime(V, A);
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#0a0e1a";
+    ctx.fillRect(0, 0, w, h);
+
+    // Draw room
+    const roomX = w * 0.2;
+    const roomY = h * 0.2;
+    const roomW = w * 0.6;
+    const roomH = h * 0.5;
+
+    ctx.strokeStyle = "#a29bfe";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(roomX, roomY, roomW, roomH);
+
+    // Sound waves (decaying over time)
+    const sourceX = roomX + roomW * 0.3;
+    const sourceY = roomY + roomH * 0.5;
+    const maxRadius = Math.min(roomW, roomH) * 0.4;
+    
+    for (let i = 0; i < 8; i++) {
+      const phase = (t * 2 + i * 0.5) % 3;
+      const radius = phase * maxRadius;
+      const opacity = Math.max(0, 1 - phase / 3) * Math.exp(-phase / T);
+      
+      ctx.strokeStyle = `rgba(162, 155, 254, ${opacity})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(sourceX, sourceY, radius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Sound source
+    ctx.fillStyle = "#a29bfe";
+    ctx.beginPath();
+    ctx.arc(sourceX, sourceY, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Absorption indicators
+    const absorptionIntensity = A / 1000;
+    ctx.fillStyle = `rgba(162, 155, 254, ${absorptionIntensity * 0.3})`;
+    ctx.fillRect(roomX, roomY, roomW, roomH);
+
+    // Labels
+    ctx.fillStyle = "#a29bfe";
+    ctx.font = "bold 14px 'IBM Plex Mono'";
+    ctx.fillText("Room Acoustics", 20, 30);
+    ctx.fillStyle = "#8fa3c8";
+    ctx.font = "11px 'IBM Plex Mono'";
+    ctx.fillText("Reverberation time • Sabine equation", 20, 48);
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "12px 'IBM Plex Mono'";
+    ctx.fillText(`Volume: ${V} m³`, 20, h * 0.8);
+    ctx.fillText(`Absorption: ${A} m²`, 20, h * 0.8 + 20);
+    ctx.fillText(`Reverb time T₆₀ = ${T.toFixed(2)} s`, 20, h * 0.8 + 40);
+  });
+  return <canvas ref={ref} className="block h-full w-full" />;
+}
+
+function AcousticsUI() {
+  const sim = useStore((s) => s.sim);
+  const setSim = useStore((s) => s.setSim);
+  const openEq = useStore((s) => s.openEq);
+  const V = Number(sim.ac_V ?? 500);
+  const A = Number(sim.ac_A ?? 100);
+  const T = reverbTime(V, A);
+
+  return (
+    <>
+      <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
+        <CanvasFrame className="h-full w-full"><AcousticsCanvas /></CanvasFrame>
+      </div>
+      <ControlPanel
+        title="Acoustics Controls" color={META.color}
+        footer={<EqButton onClick={() => openEq({
+          title: "Sabine Reverberation",
+          formula: "T₆₀ = 0.161·V/A",
+          vars: [["V", `${V} m³`], ["A", `${A} m² (absorption)`]],
+          steps: [
+            `T₆₀ = 0.161 × ${V} / ${A}`,
+            `T₆₀ = ${fmt(T, 2)} s`,
+          ],
+          result: `T₆₀ = ${fmt(T, 2)} s`,
+          note: "Reverberation time is the time for sound to decay by 60 dB. Concert halls: 1.5-2.5s.",
+        })} />}
+      >
+        <Slider label="Room volume" unit="m³" min={50} max={5000} step={50} value={V} onChange={(x) => setSim("ac_V", x)} />
+        <Slider label="Absorption" unit="m²" min={10} max={1000} step={10} value={A} onChange={(x) => setSim("ac_A", x)} />
+        <div className="grid grid-cols-2 gap-1.5">
+          <Stat label="Reverb time T₆₀" value={fmt(T, 2)} unit="s" accent="#a29bfe" />
+        </div>
+      </ControlPanel>
+    </>
+  );
+}
+
 export default function WavesWorld() {
   const exp = useStore((s) => s.exp);
   const setExp = useStore((s) => s.setExp);
@@ -337,6 +558,8 @@ export default function WavesWorld() {
       {exp === "wave" && <WaveUI />}
       {exp === "interference" && <InterferenceUI />}
       {exp === "doppler" && <DopplerUI />}
+      {exp === "sonicboom" && <SonicBoomUI />}
+      {exp === "acoustics" && <AcousticsUI />}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { useStore, WORLDS } from "../store";
 import { WorldTabs, ControlPanel, Slider, Stat, EqButton, useCanvasLoop, CanvasFrame } from "../components/ui";
-import { buoyancy, venturi, hydraulic, fmt, clamp } from "../physics";
+import { buoyancy, venturi, hydraulic, nonNewtonian, fmt, clamp } from "../physics";
 
 const META = WORLDS.find((w) => w.id === "fluids")!;
 const FLUIDS: [string, number][] = [["Oil", 850], ["Water", 1000], ["Seawater", 1025], ["Glycerin", 1260], ["Mercury", 13550]];
@@ -413,6 +413,136 @@ function HydraulicUI() {
   );
 }
 
+/* ================= Non-Newtonian Fluid ================= */
+function NonNewtonianCanvas() {
+  const ref = useCanvasLoop((ctx, w, h, t) => {
+    const sim = useStore.getState().sim;
+    const tau = Number(sim.nn_tau ?? 100);
+    const tauY = Number(sim.nn_tauY ?? 50);
+    const mu = Number(sim.nn_mu ?? 1);
+    const { gamma, viscous } = nonNewtonian(tau, tauY, mu);
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#0a0e1a";
+    ctx.fillRect(0, 0, w, h);
+
+    // Draw fluid container
+    const containerX = w * 0.2;
+    const containerY = h * 0.3;
+    const containerW = w * 0.6;
+    const containerH = h * 0.4;
+
+    // Fluid with viscosity visualization
+    const viscosity = viscous ? mu : mu * 10;
+    const colorIntensity = clamp(viscosity / 10, 0.2, 1);
+    
+    ctx.fillStyle = `rgba(77, 208, 255, ${colorIntensity * 0.5})`;
+    ctx.fillRect(containerX, containerY, containerW, containerH);
+
+    // Flow lines (slower when viscous)
+    const flowSpeed = viscous ? gamma * 0.5 : 0;
+    ctx.strokeStyle = `rgba(77, 208, 255, ${colorIntensity})`;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 10; i++) {
+      const y = containerY + (i / 10) * containerH;
+      const offset = Math.sin(t * flowSpeed + i) * 20;
+      ctx.beginPath();
+      ctx.moveTo(containerX, y);
+      ctx.quadraticCurveTo(containerX + containerW / 2, y + offset, containerX + containerW, y);
+      ctx.stroke();
+    }
+
+    // Shear stress arrow
+    ctx.strokeStyle = "#4dd0ff";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(containerX - 30, containerY + containerH / 2);
+    ctx.lineTo(containerX - 30 + tau * 0.5, containerY + containerH / 2);
+    ctx.stroke();
+    ctx.fillStyle = "#4dd0ff";
+    ctx.beginPath();
+    ctx.moveTo(containerX - 30 + tau * 0.5, containerY + containerH / 2);
+    ctx.lineTo(containerX - 30 + tau * 0.5 - 10, containerY + containerH / 2 - 5);
+    ctx.lineTo(containerX - 30 + tau * 0.5 - 10, containerY + containerH / 2 + 5);
+    ctx.closePath();
+    ctx.fill();
+
+    // Yield stress line
+    ctx.strokeStyle = "rgba(255, 180, 84, 0.5)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(containerX, containerY - 20);
+    ctx.lineTo(containerX + containerW, containerY - 20);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#ffb454";
+    ctx.font = "11px 'IBM Plex Mono'";
+    ctx.textAlign = "left";
+    ctx.fillText(`τY = ${tauY} Pa`, containerX, containerY - 25);
+
+    // Labels
+    ctx.fillStyle = "#4dd0ff";
+    ctx.font = "bold 14px 'IBM Plex Mono'";
+    ctx.fillText("Non-Newtonian Fluid", 20, 30);
+    ctx.fillStyle = "#8fa3c8";
+    ctx.font = "11px 'IBM Plex Mono'";
+    ctx.fillText("Bingham plastic model", 20, 48);
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "12px 'IBM Plex Mono'";
+    ctx.fillText(`τ = ${tau} Pa`, 20, h * 0.85);
+    ctx.fillText(`γ̇ = ${gamma.toFixed(2)} s⁻¹`, 20, h * 0.85 + 20);
+    ctx.fillText(`State: ${viscous ? "Flowing" : "Solid"}`, 20, h * 0.85 + 40);
+  });
+  return <canvas ref={ref} className="block h-full w-full" />;
+}
+
+function NonNewtonianUI() {
+  const sim = useStore((s) => s.sim);
+  const setSim = useStore((s) => s.setSim);
+  const openEq = useStore((s) => s.openEq);
+  const tau = Number(sim.nn_tau ?? 100);
+  const tauY = Number(sim.nn_tauY ?? 50);
+  const mu = Number(sim.nn_mu ?? 1);
+  const { gamma, viscous } = nonNewtonian(tau, tauY, mu);
+
+  return (
+    <>
+      <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
+        <CanvasFrame className="h-full w-full"><NonNewtonianCanvas /></CanvasFrame>
+      </div>
+      <ControlPanel
+        title="Non-Newtonian Controls" color={META.color}
+        footer={<EqButton onClick={() => openEq({
+          title: "Bingham Plastic Model",
+          formula: "γ̇ = (τ - τY) / μ    (τ > τY)",
+          vars: [["τ", `${tau} Pa`], ["τY", `${tauY} Pa`], ["μ", `${mu} Pa·s`]],
+          steps: [
+            tau > tauY
+              ? `τ > τY → fluid flows`
+              : `τ ≤ τY → fluid behaves as solid`,
+            `γ̇ = (${tau} - ${tauY}) / ${mu}`,
+            `γ̇ = ${gamma.toFixed(2)} s⁻¹`,
+          ],
+          result: `γ̇ = ${gamma.toFixed(2)} s⁻¹    State: ${viscous ? "Flowing" : "Solid"}`,
+          note: "Bingham plastics (toothpaste, paint) don't flow until shear stress exceeds yield stress τY.",
+        })} />}
+      >
+        <Slider label="Shear stress τ" unit="Pa" min={0} max={500} step={5} value={tau} onChange={(v) => setSim("nn_tau", v)} />
+        <Slider label="Yield stress τY" unit="Pa" min={0} max={300} step={5} value={tauY} onChange={(v) => setSim("nn_tauY", v)} />
+        <Slider label="Plastic viscosity μ" unit="Pa·s" min={0.1} max={10} step={0.1} value={mu} onChange={(v) => setSim("nn_mu", v)} />
+        <div className="grid grid-cols-2 gap-1.5">
+          <Stat label="Shear rate γ̇" value={fmt(gamma, 2)} unit="s⁻¹" accent="#4dd0ff" />
+          <Stat label="State" value={viscous ? "Flowing" : "Solid"} unit="" accent={viscous ? "#39f0c3" : "#ff7a9c"} />
+          <Stat label="τ/τY" value={fmt(tau / Math.max(tauY, 0.01), 2)} unit="×" />
+          <Stat label="Apparent η" value={viscous ? fmt(tau / gamma, 2) : "∞"} unit="Pa·s" />
+        </div>
+      </ControlPanel>
+    </>
+  );
+}
+
 export default function FluidsWorld() {
   const exp = useStore((s) => s.exp);
   const setExp = useStore((s) => s.setExp);
@@ -422,6 +552,7 @@ export default function FluidsWorld() {
       {exp === "buoyancy" && <BuoyancyUI />}
       {exp === "venturi" && <VenturiUI />}
       {exp === "hydraulic" && <HydraulicUI />}
+      {exp === "nonnewtonian" && <NonNewtonianUI />}
     </div>
   );
 }

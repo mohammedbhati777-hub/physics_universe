@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useStore, WORLDS } from "../store";
 import { WorldTabs, ControlPanel, Slider, Stat, EqButton, useCanvasLoop, CanvasFrame } from "../components/ui";
-import { lorentz, photoelectric, fissionEnergy, fmt, clamp } from "../physics";
+import { lorentz, photoelectric, fissionEnergy, C_LIGHT, fmt, clamp } from "../physics";
 
 const META = WORLDS.find((w) => w.id === "modern")!;
 
@@ -451,6 +451,134 @@ function FissionUI() {
   );
 }
 
+/* ================= Special Relativity ================= */
+function SpecialRelativityCanvas() {
+  const ref = useCanvasLoop((ctx, w, h, t) => {
+    const sim = useStore.getState().sim;
+    const v = Number(sim.sr_v ?? 0.6);
+    const L0 = Number(sim.sr_L0 ?? 1);
+    const m0 = Number(sim.sr_m0 ?? 1);
+    
+    const gamma = lorentz(v);
+    const L = L0 / gamma; // Length contraction
+    const m = m0 * gamma; // Relativistic mass
+    const E = m * C_LIGHT * C_LIGHT; // Total energy
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#0a0e1a";
+    ctx.fillRect(0, 0, w, h);
+
+    // Draw moving object with length contraction
+    const baseX = w * 0.2;
+    const baseY = h * 0.4;
+    const baseW = L0 * 100;
+    const baseH = 40;
+
+    // Rest frame (ghost)
+    ctx.strokeStyle = "rgba(255, 92, 168, 0.3)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.strokeRect(baseX, baseY, baseW, baseH);
+    ctx.setLineDash([]);
+
+    // Moving frame (contracted)
+    const contractedW = L * 100;
+    const moveOffset = (t * 50) % (w * 0.6);
+    ctx.fillStyle = "rgba(255, 92, 168, 0.6)";
+    ctx.fillRect(baseX + moveOffset, baseY, contractedW, baseH);
+    ctx.strokeStyle = "#ff5ca8";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(baseX + moveOffset, baseY, contractedW, baseH);
+
+    // Velocity arrow
+    ctx.strokeStyle = "#ff5ca8";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(baseX - 40, baseY + baseH / 2);
+    ctx.lineTo(baseX - 40 + v * 100, baseY + baseH / 2);
+    ctx.stroke();
+    ctx.fillStyle = "#ff5ca8";
+    ctx.beginPath();
+    ctx.moveTo(baseX - 40 + v * 100, baseY + baseH / 2);
+    ctx.lineTo(baseX - 40 + v * 100 - 10, baseY + baseH / 2 - 5);
+    ctx.lineTo(baseX - 40 + v * 100 - 10, baseY + baseH / 2 + 5);
+    ctx.closePath();
+    ctx.fill();
+
+    // Labels
+    ctx.fillStyle = "#ff5ca8";
+    ctx.font = "bold 14px 'IBM Plex Mono'";
+    ctx.textAlign = "left";
+    ctx.fillText("Special Relativity", 20, 30);
+    ctx.fillStyle = "#8fa3c8";
+    ctx.font = "11px 'IBM Plex Mono'";
+    ctx.fillText("Length contraction • Relativistic mass", 20, 48);
+
+    ctx.fillStyle = "rgba(255, 92, 168, 0.5)";
+    ctx.font = "10px 'IBM Plex Mono'";
+    ctx.fillText("Rest frame", baseX, baseY - 10);
+    ctx.fillStyle = "#ff5ca8";
+    ctx.fillText("Moving frame (contracted)", baseX + moveOffset, baseY - 10);
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "12px 'IBM Plex Mono'";
+    ctx.fillText(`v = ${v.toFixed(2)}c`, 20, h * 0.75);
+    ctx.fillText(`γ = ${gamma.toFixed(3)}`, 20, h * 0.75 + 20);
+    ctx.fillText(`L = ${L.toFixed(3)} m (from ${L0} m)`, 20, h * 0.75 + 40);
+    ctx.fillText(`m = ${m.toFixed(3)} kg (from ${m0} kg)`, 200, h * 0.75);
+    ctx.fillText(`E = ${(E / 1e16).toFixed(2)} × 10¹⁶ J`, 200, h * 0.75 + 20);
+  });
+  return <canvas ref={ref} className="block h-full w-full" />;
+}
+
+function SpecialRelativityUI() {
+  const sim = useStore((s) => s.sim);
+  const setSim = useStore((s) => s.setSim);
+  const openEq = useStore((s) => s.openEq);
+  const v = Number(sim.sr_v ?? 0.6);
+  const L0 = Number(sim.sr_L0 ?? 1);
+  const m0 = Number(sim.sr_m0 ?? 1);
+  
+  const gamma = lorentz(v);
+  const L = L0 / gamma;
+  const m = m0 * gamma;
+  const E = m * C_LIGHT * C_LIGHT;
+
+  return (
+    <>
+      <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
+        <CanvasFrame className="h-full w-full"><SpecialRelativityCanvas /></CanvasFrame>
+      </div>
+      <ControlPanel
+        title="Relativity Controls" color={META.color}
+        footer={<EqButton onClick={() => openEq({
+          title: "Special Relativity",
+          formula: "γ = 1/√(1-v²/c²)    L = L₀/γ    m = m₀γ    E = mc²",
+          vars: [["v", `${v}c`], ["L₀", `${L0} m`], ["m₀", `${m0} kg`]],
+          steps: [
+            `γ = 1/√(1-${v}²) = ${gamma.toFixed(3)}`,
+            `L = L₀/γ = ${L0}/${gamma.toFixed(3)} = ${L.toFixed(3)} m`,
+            `m = m₀γ = ${m0} × ${gamma.toFixed(3)} = ${m.toFixed(3)} kg`,
+            `E = mc² = ${m.toFixed(3)} × (3×10⁸)² = ${(E / 1e16).toFixed(2)} × 10¹⁶ J`,
+          ],
+          result: `L = ${L.toFixed(3)} m    m = ${m.toFixed(3)} kg    γ = ${gamma.toFixed(3)}`,
+          note: "As v → c, γ → ∞. Length contracts, mass increases, time dilates. Nothing with mass can reach c.",
+        })} />}
+      >
+        <Slider label="Velocity v" unit="c" min={0} max={0.99} step={0.01} value={v} onChange={(x) => setSim("sr_v", x)} />
+        <Slider label="Rest length L₀" unit="m" min={0.5} max={3} step={0.1} value={L0} onChange={(x) => setSim("sr_L0", x)} />
+        <Slider label="Rest mass m₀" unit="kg" min={0.5} max={5} step={0.1} value={m0} onChange={(x) => setSim("sr_m0", x)} />
+        <div className="grid grid-cols-2 gap-1.5">
+          <Stat label="Lorentz γ" value={fmt(gamma, 3)} unit="" accent="#ff5ca8" />
+          <Stat label="Contracted L" value={fmt(L, 3)} unit="m" />
+          <Stat label="Relativistic m" value={fmt(m, 3)} unit="kg" />
+          <Stat label="Total energy E" value={fmt(E / 1e16, 2)} unit="×10¹⁶ J" accent="#ffb454" />
+        </div>
+      </ControlPanel>
+    </>
+  );
+}
+
 export default function ModernWorld() {
   const exp = useStore((s) => s.exp);
   const setExp = useStore((s) => s.setExp);
@@ -460,6 +588,7 @@ export default function ModernWorld() {
       {exp === "dilation" && <DilationUI />}
       {exp === "photoelectric" && <PhotoelectricUI />}
       {exp === "fission" && <FissionUI />}
+      {exp === "relativity" && <SpecialRelativityUI />}
     </div>
   );
 }
