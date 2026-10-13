@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { useStore, WORLDS } from "../store";
 import { WorldTabs, ControlPanel, Slider, Stat, EqButton, useCanvasLoop, CanvasFrame } from "../components/ui";
-import { idealGas, carnot, newtonCooling, R_GAS, fmt, clamp } from "../physics";
+import { idealGas, carnot, newtonCooling, stirlingEngine, R_GAS, fmt, clamp } from "../physics";
 
 const META = WORLDS.find((w) => w.id === "thermo")!;
 
@@ -390,6 +390,150 @@ function CoolingUI() {
   );
 }
 
+/* ================= Stirling Engine ================= */
+function StirlingCanvas() {
+  const ref = useCanvasLoop((ctx, w, h, t) => {
+    const sim = useStore.getState().sim;
+    const Th = Number(sim.st_Th ?? 800);
+    const Tc = Number(sim.st_Tc ?? 300);
+    const Vmax = Number(sim.st_Vmax ?? 2);
+    const Vmin = Number(sim.st_Vmin ?? 1);
+    const { W, Qh, eff } = stirlingEngine(Th, Tc, Vmax, Vmin);
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#0a0e1a";
+    ctx.fillRect(0, 0, w, h);
+
+    // Draw engine cycle
+    const cx = w / 2;
+    const cy = h * 0.4;
+    const radius = Math.min(w, h) * 0.15;
+
+    // Cycle phases
+    const phase = (t * 0.5) % 4;
+    const angle = (phase / 4) * Math.PI * 2;
+
+    // Piston animation
+    const pistonX = cx + Math.cos(angle) * radius;
+    const pistonY = cy + Math.sin(angle) * radius;
+
+    // Cylinder
+    ctx.strokeStyle = "#ff7b6b";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(cx - radius * 1.5, cy - radius * 0.3, radius * 3, radius * 0.6);
+
+    // Piston
+    ctx.fillStyle = "#8fa3c8";
+    ctx.fillRect(pistonX - 10, cy - radius * 0.25, 20, radius * 0.5);
+
+    // Hot reservoir
+    ctx.fillStyle = "rgba(255, 123, 107, 0.3)";
+    ctx.fillRect(cx - radius * 2, cy - radius * 1.5, radius, radius * 0.5);
+    ctx.fillStyle = "#ff7b6b";
+    ctx.font = "bold 12px 'IBM Plex Mono'";
+    ctx.textAlign = "center";
+    ctx.fillText(`Hot ${Th}K`, cx - radius * 1.5, cy - radius * 1.2);
+
+    // Cold reservoir
+    ctx.fillStyle = "rgba(83, 232, 255, 0.3)";
+    ctx.fillRect(cx + radius, cy - radius * 1.5, radius, radius * 0.5);
+    ctx.fillStyle = "#53e8ff";
+    ctx.fillText(`Cold ${Tc}K`, cx + radius * 1.5, cy - radius * 1.2);
+
+    // PV diagram
+    const graphX = w * 0.1;
+    const graphY = h * 0.7;
+    const graphW = w * 0.8;
+    const graphH = h * 0.2;
+
+    ctx.strokeStyle = "rgba(255, 123, 107, 0.3)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i <= 100; i++) {
+      const V = Vmin + (i / 100) * (Vmax - Vmin);
+      const P = (1 * R_GAS * Th) / V;
+      const px = graphX + (i / 100) * graphW;
+      const py = graphY + graphH - (P / 1000) * graphH;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    // Current point
+    const currentV = Vmin + ((Math.sin(angle) + 1) / 2) * (Vmax - Vmin);
+    const currentP = (1 * R_GAS * (phase < 2 ? Th : Tc)) / currentV;
+    const currentX = graphX + ((currentV - Vmin) / (Vmax - Vmin)) * graphW;
+    const currentY = graphY + graphH - (currentP / 1000) * graphH;
+
+    ctx.fillStyle = "#ff7b6b";
+    ctx.beginPath();
+    ctx.arc(currentX, currentY, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Labels
+    ctx.fillStyle = "#ff7b6b";
+    ctx.font = "bold 14px 'IBM Plex Mono'";
+    ctx.textAlign = "left";
+    ctx.fillText("Stirling Engine", 20, 30);
+    ctx.fillStyle = "#8fa3c8";
+    ctx.font = "11px 'IBM Plex Mono'";
+    ctx.fillText("Regenerative heat engine cycle", 20, 48);
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "12px 'IBM Plex Mono'";
+    ctx.fillText(`W = ${W.toFixed(1)} J`, 20, h * 0.95);
+    ctx.fillText(`Qh = ${Qh.toFixed(1)} J`, 200, h * 0.95);
+    ctx.fillText(`η = ${(eff * 100).toFixed(1)}%`, 400, h * 0.95);
+  });
+  return <canvas ref={ref} className="block h-full w-full" />;
+}
+
+function StirlingUI() {
+  const sim = useStore((s) => s.sim);
+  const setSim = useStore((s) => s.setSim);
+  const openEq = useStore((s) => s.openEq);
+  const Th = Number(sim.st_Th ?? 800);
+  const Tc = Number(sim.st_Tc ?? 300);
+  const Vmax = Number(sim.st_Vmax ?? 2);
+  const Vmin = Number(sim.st_Vmin ?? 1);
+  const { W, Qh, eff } = stirlingEngine(Th, Tc, Vmax, Vmin);
+
+  return (
+    <>
+      <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
+        <CanvasFrame className="h-full w-full"><StirlingCanvas /></CanvasFrame>
+      </div>
+      <ControlPanel
+        title="Stirling Controls" color={META.color}
+        footer={<EqButton onClick={() => openEq({
+          title: "Stirling Engine",
+          formula: "W = nR(Th-Tc)ln(Vmax/Vmin)    η = 1-Tc/Th",
+          vars: [["Th", `${Th} K`], ["Tc", `${Tc} K`], ["Vmax", `${Vmax} L`], ["Vmin", `${Vmin} L`]],
+          steps: [
+            `W = 1 × 8.314 × (${Th}-${Tc}) × ln(${Vmax}/${Vmin})`,
+            `W = ${W.toFixed(1)} J`,
+            `Qh = nRTh·ln(Vmax/Vmin) = ${Qh.toFixed(1)} J`,
+            `η = W/Qh = ${(eff * 100).toFixed(1)}%`,
+          ],
+          result: `W = ${W.toFixed(1)} J    η = ${(eff * 100).toFixed(1)}%`,
+          note: "Stirling engine uses external combustion and regeneration. Theoretical efficiency equals Carnot.",
+        })} />}
+      >
+        <Slider label="Hot temperature Th" unit="K" min={300} max={1500} step={10} value={Th} onChange={(v) => setSim("st_Th", v)} />
+        <Slider label="Cold temperature Tc" unit="K" min={200} max={Th - 50} step={10} value={Tc} onChange={(v) => setSim("st_Tc", v)} />
+        <Slider label="Vmax" unit="L" min={1} max={5} step={0.1} value={Vmax} onChange={(v) => setSim("st_Vmax", v)} />
+        <Slider label="Vmin" unit="L" min={0.5} max={Vmax - 0.1} step={0.1} value={Vmin} onChange={(v) => setSim("st_Vmin", v)} />
+        <div className="grid grid-cols-2 gap-1.5">
+          <Stat label="Work W" value={fmt(W, 1)} unit="J" accent="#ff7b6b" />
+          <Stat label="Heat Qh" value={fmt(Qh, 1)} unit="J" />
+          <Stat label="Efficiency η" value={fmt(eff * 100, 1)} unit="%" accent="#39f0c3" />
+          <Stat label="Compression ratio" value={fmt(Vmax / Vmin, 2)} unit="×" />
+        </div>
+      </ControlPanel>
+    </>
+  );
+}
+
 export default function ThermoWorld() {
   const exp = useStore((s) => s.exp);
   const setExp = useStore((s) => s.setExp);
@@ -399,6 +543,7 @@ export default function ThermoWorld() {
       {exp === "gas" && <GasUI />}
       {exp === "carnot" && <CarnotUI />}
       {exp === "cooling" && <CoolingUI />}
+      {exp === "stirling" && <StirlingUI />}
     </div>
   );
 }

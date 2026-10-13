@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { RotateCcw } from "lucide-react";
 import { useStore, WORLDS, IS_COARSE } from "../store";
 import { WorldTabs, ControlPanel, Slider, Stat, Seg, Btn, EqButton, useCanvasLoop, CanvasFrame } from "../components/ui";
-import { slitPattern, tunnelProbability, fmt, clamp } from "../physics";
+import { slitPattern, tunnelProbability, schrodinger1D, fmt, clamp } from "../physics";
 
 const META = WORLDS.find((w) => w.id === "quantum")!;
 
@@ -331,6 +331,142 @@ function TunnelingUI() {
   );
 }
 
+/* ================= Schrödinger Solver ================= */
+function SchrödingerCanvas() {
+  const ref = useCanvasLoop((ctx, w, h, t) => {
+    const sim = useStore.getState().sim;
+    const n = Number(sim.sch_n ?? 1);
+    const L = Number(sim.sch_L ?? 2);
+    const x = Number(sim.sch_x ?? 1);
+    const { psi, prob, E } = schrodinger1D(n, L, x);
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#0a0e1a";
+    ctx.fillRect(0, 0, w, h);
+
+    const margin = 60;
+    const graphW = w - margin * 2;
+    const graphH = h * 0.35;
+    const graphY = h * 0.15;
+
+    // Draw potential well
+    ctx.strokeStyle = "rgba(207, 139, 255, 0.5)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(margin, graphY);
+    ctx.lineTo(margin, graphY + graphH);
+    ctx.lineTo(margin + graphW, graphY + graphH);
+    ctx.lineTo(margin + graphW, graphY);
+    ctx.stroke();
+
+    // Draw wavefunction ψ(x)
+    ctx.strokeStyle = "#cf8bff";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i <= 100; i++) {
+      const xPos = (i / 100) * L;
+      const { psi: psiVal } = schrodinger1D(n, L, xPos);
+      const px = margin + (i / 100) * graphW;
+      const py = graphY + graphH / 2 - psiVal * graphH * 0.4;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    // Draw probability density |ψ|²
+    ctx.strokeStyle = "#39f0c3";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i <= 100; i++) {
+      const xPos = (i / 100) * L;
+      const { prob: probVal } = schrodinger1D(n, L, xPos);
+      const px = margin + (i / 100) * graphW;
+      const py = graphY + graphH - probVal * graphH * 0.8;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    // Current position marker
+    const markerX = margin + (x / L) * graphW;
+    ctx.strokeStyle = "#ffb454";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(markerX, graphY);
+    ctx.lineTo(markerX, graphY + graphH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Labels
+    ctx.fillStyle = "#cf8bff";
+    ctx.font = "bold 14px 'IBM Plex Mono'";
+    ctx.textAlign = "left";
+    ctx.fillText("Schrödinger Equation", 20, 30);
+    ctx.fillStyle = "#8fa3c8";
+    ctx.font = "11px 'IBM Plex Mono'";
+    ctx.fillText("Particle in a 1D infinite well", 20, 48);
+
+    ctx.fillStyle = "#cf8bff";
+    ctx.fillText("ψ(x)", margin - 40, graphY + 20);
+    ctx.fillStyle = "#39f0c3";
+    ctx.fillText("|ψ|²", margin - 40, graphY + graphH - 10);
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "12px 'IBM Plex Mono'";
+    ctx.fillText(`n = ${n}`, 20, h * 0.75);
+    ctx.fillText(`L = ${L} nm`, 20, h * 0.75 + 20);
+    ctx.fillText(`ψ(x) = ${psi.toFixed(3)}`, 20, h * 0.75 + 40);
+    ctx.fillText(`|ψ|² = ${prob.toFixed(3)}`, 200, h * 0.75);
+    ctx.fillText(`E = ${E.toFixed(2)} eV`, 200, h * 0.75 + 20);
+  });
+  return <canvas ref={ref} className="block h-full w-full" />;
+}
+
+function SchrödingerUI() {
+  const sim = useStore((s) => s.sim);
+  const setSim = useStore((s) => s.setSim);
+  const openEq = useStore((s) => s.openEq);
+  const n = Number(sim.sch_n ?? 1);
+  const L = Number(sim.sch_L ?? 2);
+  const x = Number(sim.sch_x ?? 1);
+  const { psi, prob, E } = schrodinger1D(n, L, x);
+
+  return (
+    <>
+      <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
+        <CanvasFrame className="h-full w-full"><SchrödingerCanvas /></CanvasFrame>
+      </div>
+      <ControlPanel
+        title="Schrödinger Controls" color={META.color}
+        footer={<EqButton onClick={() => openEq({
+          title: "Schrödinger Equation",
+          formula: "ψ(x) = √(2/L)·sin(nπx/L)    E = n²π²ℏ²/(2mL²)",
+          vars: [["n", `${n}`], ["L", `${L} nm`], ["x", `${x} nm`]],
+          steps: [
+            `ψ(x) = √(2/${L})·sin(${n}π·${x}/${L})`,
+            `ψ(${x}) = ${psi.toFixed(4)}`,
+            `|ψ|² = ${prob.toFixed(4)} (probability density)`,
+            `E = ${n}²·π²·ℏ²/(2m·${L}²) = ${E.toFixed(2)} eV`,
+          ],
+          result: `ψ = ${psi.toFixed(3)}    |ψ|² = ${prob.toFixed(3)}    E = ${E.toFixed(2)} eV`,
+          note: "Quantization arises from boundary conditions. Only discrete energy levels are allowed.",
+        })} />}
+      >
+        <Slider label="Quantum number n" unit="" min={1} max={10} step={1} value={n} onChange={(v) => setSim("sch_n", v)} />
+        <Slider label="Well width L" unit="nm" min={0.5} max={5} step={0.1} value={L} onChange={(v) => setSim("sch_L", v)} />
+        <Slider label="Position x" unit="nm" min={0} max={L} step={0.01} value={x} onChange={(v) => setSim("sch_x", v)} />
+        <div className="grid grid-cols-2 gap-1.5">
+          <Stat label="ψ(x)" value={fmt(psi, 3)} unit="" accent="#cf8bff" />
+          <Stat label="|ψ|²" value={fmt(prob, 3)} unit="" accent="#39f0c3" />
+          <Stat label="Energy E" value={fmt(E, 2)} unit="eV" accent="#ffb454" />
+          <Stat label="State" value={`n=${n}`} unit="" />
+        </div>
+      </ControlPanel>
+    </>
+  );
+}
+
 export default function QuantumWorld() {
   const exp = useStore((s) => s.exp);
   const setExp = useStore((s) => s.setExp);
@@ -339,6 +475,7 @@ export default function QuantumWorld() {
       <WorldTabs items={META.experiments} active={exp} onSelect={setExp} color={META.color} />
       {exp === "doubleslit" && <DoubleSlitUI />}
       {exp === "tunneling" && <TunnelingUI />}
+      {exp === "schrodinger" && <SchrödingerUI />}
     </div>
   );
 }
