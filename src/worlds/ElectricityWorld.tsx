@@ -471,6 +471,111 @@ function MagnetUI() {
 }
 
 /* ================= PN Junction ================= */
+function PNJunctionCanvas() {
+  const ref = useCanvasLoop((ctx, w, h) => {
+    const sim = useStore.getState().sim;
+    const V = Number(sim.pn_V ?? 0.7);
+    const { I } = pnJunction(V);
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#0a0e1a";
+    ctx.fillRect(0, 0, w, h);
+
+    // Draw diode symbol
+    const centerX = w / 2;
+    const centerY = h * 0.4;
+    const size = 60;
+
+    // P region (left)
+    ctx.fillStyle = "#ff6b6b";
+    ctx.fillRect(centerX - size * 1.5, centerY - size / 2, size, size);
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 24px 'IBM Plex Mono'";
+    ctx.textAlign = "center";
+    ctx.fillText("P", centerX - size, centerY + 8);
+
+    // N region (right)
+    ctx.fillStyle = "#4ecdc4";
+    ctx.fillRect(centerX + size * 0.5, centerY - size / 2, size, size);
+    ctx.fillStyle = "#fff";
+    ctx.fillText("N", centerX + size, centerY + 8);
+
+    // Junction
+    ctx.strokeStyle = "#f9ca24";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(centerX - size * 0.5, centerY - size / 2);
+    ctx.lineTo(centerX - size * 0.5, centerY + size / 2);
+    ctx.stroke();
+
+    // Depletion region
+    const depletionWidth = Math.abs(V) < 0.7 ? 30 : 10;
+    ctx.fillStyle = "rgba(249, 202, 36, 0.2)";
+    ctx.fillRect(centerX - size * 0.5 - depletionWidth / 2, centerY - size / 2, depletionWidth, size);
+
+    // Current flow arrow (if forward biased)
+    if (V > 0 && I > 0.001) {
+      ctx.strokeStyle = "#f9ca24";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(centerX - size * 2, centerY);
+      ctx.lineTo(centerX + size * 2, centerY);
+      ctx.stroke();
+      
+      // Arrow head
+      ctx.fillStyle = "#f9ca24";
+      ctx.beginPath();
+      ctx.moveTo(centerX + size * 2, centerY);
+      ctx.lineTo(centerX + size * 2 - 10, centerY - 5);
+      ctx.lineTo(centerX + size * 2 - 10, centerY + 5);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // I-V curve
+    const graphX = w * 0.1;
+    const graphY = h * 0.7;
+    const graphW = w * 0.8;
+    const graphH = h * 0.2;
+
+    ctx.strokeStyle = "rgba(249, 202, 36, 0.3)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i <= 100; i++) {
+      const voltage = -1 + (i / 100) * 2;
+      const { I: current } = pnJunction(voltage);
+      const x = graphX + (i / 100) * graphW;
+      const y = graphY + graphH - (Math.min(Math.abs(current) * 1e3, 10) / 10) * graphH;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Current point
+    const currentX = graphX + ((V + 1) / 2) * graphW;
+    const currentY = graphY + graphH - (Math.min(Math.abs(I) * 1e3, 10) / 10) * graphH;
+    ctx.fillStyle = "#f9ca24";
+    ctx.beginPath();
+    ctx.arc(currentX, currentY, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Labels
+    ctx.fillStyle = "#f9ca24";
+    ctx.font = "bold 14px 'IBM Plex Mono'";
+    ctx.textAlign = "left";
+    ctx.fillText("PN Junction Diode", 20, 30);
+    ctx.fillStyle = "#8fa3c8";
+    ctx.font = "11px 'IBM Plex Mono'";
+    ctx.fillText("Shockley equation • I-V characteristic", 20, 48);
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "12px 'IBM Plex Mono'";
+    ctx.fillText(`V = ${V.toFixed(2)} V`, 20, h * 0.95);
+    ctx.fillText(`I = ${(I * 1e3).toFixed(2)} mA`, 200, h * 0.95);
+  });
+  return <canvas ref={ref} className="block h-full w-full" />;
+}
+
 function PNJunctionUI() {
   const sim = useStore((s) => s.sim);
   const setSim = useStore((s) => s.setSim);
@@ -481,13 +586,7 @@ function PNJunctionUI() {
   return (
     <>
       <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
-        <CanvasFrame className="h-full w-full">
-          <div className="relative h-full w-full">
-            <canvas className="block h-full w-full" />
-            <div className="absolute left-3 top-3 text-[12px] text-[#f9ca24]">PN Junction Diode</div>
-            <div className="absolute left-3 top-7 text-[10px] text-[#8fa3c8]">Shockley equation • I-V characteristic</div>
-          </div>
-        </CanvasFrame>
+        <CanvasFrame className="h-full w-full"><PNJunctionCanvas /></CanvasFrame>
       </div>
       <ControlPanel
         title="Diode Controls" color={META.color}
@@ -514,6 +613,91 @@ function PNJunctionUI() {
 }
 
 /* ================= MOSFET ================= */
+function MOSFETCanvas() {
+  const ref = useCanvasLoop((ctx, w, h) => {
+    const sim = useStore.getState().sim;
+    const Vgs = Number(sim.mf_Vgs ?? 2.5);
+    const Vth = Number(sim.mf_Vth ?? 1.5);
+    const Vds = Number(sim.mf_Vds ?? 2);
+    const { Id, region } = mosfet(Vgs, Vth, Vds);
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#0a0e1a";
+    ctx.fillRect(0, 0, w, h);
+
+    // Draw MOSFET structure
+    const centerX = w / 2;
+    const centerY = h * 0.35;
+    const size = 80;
+
+    // Substrate (P-type)
+    ctx.fillStyle = "#ff6b6b";
+    ctx.fillRect(centerX - size, centerY, size * 2, size);
+    ctx.fillStyle = "#fff";
+    ctx.font = "12px 'IBM Plex Mono'";
+    ctx.textAlign = "center";
+    ctx.fillText("P-substrate", centerX, centerY + size + 20);
+
+    // Source (N+)
+    ctx.fillStyle = "#4ecdc4";
+    ctx.fillRect(centerX - size, centerY - size * 0.3, size * 0.4, size * 0.3);
+    ctx.fillStyle = "#fff";
+    ctx.fillText("S", centerX - size * 0.8, centerY - size * 0.15);
+
+    // Drain (N+)
+    ctx.fillStyle = "#4ecdc4";
+    ctx.fillRect(centerX + size * 0.6, centerY - size * 0.3, size * 0.4, size * 0.3);
+    ctx.fillStyle = "#fff";
+    ctx.fillText("D", centerX + size * 0.8, centerY - size * 0.15);
+
+    // Gate oxide
+    ctx.fillStyle = "rgba(0, 184, 148, 0.3)";
+    ctx.fillRect(centerX - size * 0.5, centerY - size * 0.5, size, size * 0.2);
+
+    // Gate
+    ctx.fillStyle = "#00b894";
+    ctx.fillRect(centerX - size * 0.5, centerY - size * 0.7, size, size * 0.2);
+    ctx.fillStyle = "#fff";
+    ctx.fillText("G", centerX, centerY - size * 0.6);
+
+    // Channel (if Vgs > Vth)
+    if (Vgs > Vth) {
+      const channelOpacity = Math.min((Vgs - Vth) / 2, 1);
+      ctx.fillStyle = `rgba(0, 184, 148, ${channelOpacity * 0.5})`;
+      ctx.fillRect(centerX - size * 0.5, centerY - size * 0.3, size, size * 0.3);
+      
+      // Current flow
+      if (Id > 0.001) {
+        ctx.strokeStyle = "#00b894";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(centerX - size * 0.8, centerY - size * 0.15);
+        ctx.lineTo(centerX + size * 0.8, centerY - size * 0.15);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // Labels
+    ctx.fillStyle = "#00b894";
+    ctx.font = "bold 14px 'IBM Plex Mono'";
+    ctx.textAlign = "left";
+    ctx.fillText("MOSFET Transistor", 20, 30);
+    ctx.fillStyle = "#8fa3c8";
+    ctx.font = "11px 'IBM Plex Mono'";
+    ctx.fillText("Inversion layer • Square law model", 20, 48);
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "12px 'IBM Plex Mono'";
+    ctx.fillText(`Vgs = ${Vgs.toFixed(1)} V`, 20, h * 0.85);
+    ctx.fillText(`Vds = ${Vds.toFixed(1)} V`, 20, h * 0.85 + 20);
+    ctx.fillText(`Id = ${(Id * 1e3).toFixed(2)} mA`, 200, h * 0.85);
+    ctx.fillText(`Region: ${region}`, 200, h * 0.85 + 20);
+  });
+  return <canvas ref={ref} className="block h-full w-full" />;
+}
+
 function MOSFETUI() {
   const sim = useStore((s) => s.sim);
   const setSim = useStore((s) => s.setSim);
@@ -526,13 +710,7 @@ function MOSFETUI() {
   return (
     <>
       <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
-        <CanvasFrame className="h-full w-full">
-          <div className="relative h-full w-full">
-            <canvas className="block h-full w-full" />
-            <div className="absolute left-3 top-3 text-[12px] text-[#00b894]">MOSFET Transistor</div>
-            <div className="absolute left-3 top-7 text-[10px] text-[#8fa3c8]">Inversion layer • Square law model</div>
-          </div>
-        </CanvasFrame>
+        <CanvasFrame className="h-full w-full"><MOSFETCanvas /></CanvasFrame>
       </div>
       <ControlPanel
         title="MOSFET Controls" color={META.color}

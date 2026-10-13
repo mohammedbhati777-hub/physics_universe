@@ -329,6 +329,86 @@ function DopplerUI() {
 }
 
 /* ================= Sonic Boom ================= */
+function SonicBoomCanvas() {
+  const ref = useCanvasLoop((ctx, w, h, t) => {
+    const sim = useStore.getState().sim;
+    const v = Number(sim.sb_v ?? 400);
+    const { M, theta } = sonicBoom(v);
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#0a0e1a";
+    ctx.fillRect(0, 0, w, h);
+
+    // Draw aircraft
+    const aircraftX = w * 0.3 + (t * 50) % (w * 0.5);
+    const aircraftY = h * 0.4;
+
+    // Mach cone (if supersonic)
+    if (M > 1 && !isNaN(theta)) {
+      const thetaRad = (theta * Math.PI) / 180;
+      const coneLength = w * 0.6;
+      
+      ctx.strokeStyle = "rgba(255, 107, 107, 0.4)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(aircraftX, aircraftY);
+      ctx.lineTo(aircraftX - coneLength * Math.cos(thetaRad), aircraftY - coneLength * Math.sin(thetaRad));
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(aircraftX, aircraftY);
+      ctx.lineTo(aircraftX - coneLength * Math.cos(thetaRad), aircraftY + coneLength * Math.sin(thetaRad));
+      ctx.stroke();
+
+      // Fill cone
+      ctx.fillStyle = "rgba(255, 107, 107, 0.1)";
+      ctx.beginPath();
+      ctx.moveTo(aircraftX, aircraftY);
+      ctx.lineTo(aircraftX - coneLength * Math.cos(thetaRad), aircraftY - coneLength * Math.sin(thetaRad));
+      ctx.lineTo(aircraftX - coneLength * Math.cos(thetaRad), aircraftY + coneLength * Math.sin(thetaRad));
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Aircraft
+    ctx.fillStyle = "#ff6b6b";
+    ctx.beginPath();
+    ctx.moveTo(aircraftX + 20, aircraftY);
+    ctx.lineTo(aircraftX - 10, aircraftY - 8);
+    ctx.lineTo(aircraftX - 10, aircraftY + 8);
+    ctx.closePath();
+    ctx.fill();
+
+    // Shock wave rings (if supersonic)
+    if (M > 1) {
+      for (let i = 0; i < 5; i++) {
+        const ringX = aircraftX - i * 80;
+        const ringRadius = i * 40;
+        ctx.strokeStyle = `rgba(255, 107, 107, ${0.3 - i * 0.05})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(ringX, aircraftY, ringRadius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    // Labels
+    ctx.fillStyle = "#ff6b6b";
+    ctx.font = "bold 14px 'IBM Plex Mono'";
+    ctx.fillText("Sonic Boom", 20, 30);
+    ctx.fillStyle = "#8fa3c8";
+    ctx.font = "11px 'IBM Plex Mono'";
+    ctx.fillText("Mach cone • Shock wave formation", 20, 48);
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "12px 'IBM Plex Mono'";
+    ctx.fillText(`Mach ${M.toFixed(2)}`, 20, h * 0.75);
+    if (M > 1 && !isNaN(theta)) {
+      ctx.fillText(`Cone angle: ${theta.toFixed(1)}°`, 20, h * 0.75 + 20);
+    }
+  });
+  return <canvas ref={ref} className="block h-full w-full" />;
+}
+
 function SonicBoomUI() {
   const sim = useStore((s) => s.sim);
   const setSim = useStore((s) => s.setSim);
@@ -339,13 +419,7 @@ function SonicBoomUI() {
   return (
     <>
       <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
-        <CanvasFrame className="h-full w-full">
-          <div className="relative h-full w-full">
-            <canvas className="block h-full w-full" />
-            <div className="absolute left-3 top-3 text-[12px] text-[#ff6b6b]">Sonic Boom</div>
-            <div className="absolute left-3 top-7 text-[10px] text-[#8fa3c8]">Mach cone • Shock wave formation</div>
-          </div>
-        </CanvasFrame>
+        <CanvasFrame className="h-full w-full"><SonicBoomCanvas /></CanvasFrame>
       </div>
       <ControlPanel
         title="Sonic Boom Controls" color={META.color}
@@ -372,6 +446,72 @@ function SonicBoomUI() {
 }
 
 /* ================= Room Acoustics ================= */
+function AcousticsCanvas() {
+  const ref = useCanvasLoop((ctx, w, h, t) => {
+    const sim = useStore.getState().sim;
+    const V = Number(sim.ac_V ?? 500);
+    const A = Number(sim.ac_A ?? 100);
+    const T = reverbTime(V, A);
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#0a0e1a";
+    ctx.fillRect(0, 0, w, h);
+
+    // Draw room
+    const roomX = w * 0.2;
+    const roomY = h * 0.2;
+    const roomW = w * 0.6;
+    const roomH = h * 0.5;
+
+    ctx.strokeStyle = "#a29bfe";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(roomX, roomY, roomW, roomH);
+
+    // Sound waves (decaying over time)
+    const sourceX = roomX + roomW * 0.3;
+    const sourceY = roomY + roomH * 0.5;
+    const maxRadius = Math.min(roomW, roomH) * 0.4;
+    
+    for (let i = 0; i < 8; i++) {
+      const phase = (t * 2 + i * 0.5) % 3;
+      const radius = phase * maxRadius;
+      const opacity = Math.max(0, 1 - phase / 3) * Math.exp(-phase / T);
+      
+      ctx.strokeStyle = `rgba(162, 155, 254, ${opacity})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(sourceX, sourceY, radius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Sound source
+    ctx.fillStyle = "#a29bfe";
+    ctx.beginPath();
+    ctx.arc(sourceX, sourceY, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Absorption indicators
+    const absorptionIntensity = A / 1000;
+    ctx.fillStyle = `rgba(162, 155, 254, ${absorptionIntensity * 0.3})`;
+    ctx.fillRect(roomX, roomY, roomW, roomH);
+
+    // Labels
+    ctx.fillStyle = "#a29bfe";
+    ctx.font = "bold 14px 'IBM Plex Mono'";
+    ctx.fillText("Room Acoustics", 20, 30);
+    ctx.fillStyle = "#8fa3c8";
+    ctx.font = "11px 'IBM Plex Mono'";
+    ctx.fillText("Reverberation time • Sabine equation", 20, 48);
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "12px 'IBM Plex Mono'";
+    ctx.fillText(`Volume: ${V} m³`, 20, h * 0.8);
+    ctx.fillText(`Absorption: ${A} m²`, 20, h * 0.8 + 20);
+    ctx.fillText(`Reverb time T₆₀ = ${T.toFixed(2)} s`, 20, h * 0.8 + 40);
+  });
+  return <canvas ref={ref} className="block h-full w-full" />;
+}
+
 function AcousticsUI() {
   const sim = useStore((s) => s.sim);
   const setSim = useStore((s) => s.setSim);
@@ -383,13 +523,7 @@ function AcousticsUI() {
   return (
     <>
       <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
-        <CanvasFrame className="h-full w-full">
-          <div className="relative h-full w-full">
-            <canvas className="block h-full w-full" />
-            <div className="absolute left-3 top-3 text-[12px] text-[#a29bfe]">Room Acoustics</div>
-            <div className="absolute left-3 top-7 text-[10px] text-[#8fa3c8]">Reverberation time • Sabine equation</div>
-          </div>
-        </CanvasFrame>
+        <CanvasFrame className="h-full w-full"><AcousticsCanvas /></CanvasFrame>
       </div>
       <ControlPanel
         title="Acoustics Controls" color={META.color}

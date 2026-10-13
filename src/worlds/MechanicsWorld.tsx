@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef } from "react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from "recharts";
 import { Rocket, RotateCcw, Play } from "lucide-react";
 import { useStore, WORLDS } from "../store";
-import { WorldTabs, ControlPanel, Slider, Toggle, Stat, Btn, Seg, EqButton } from "../components/ui";
-import { projectile, pendulumPeriod, pendulumStep, collide1D, fmt } from "../physics";
+import { WorldTabs, ControlPanel, Slider, Toggle, Stat, Btn, Seg, EqButton, useCanvasLoop, CanvasFrame } from "../components/ui";
+import { projectile, pendulumPeriod, pendulumStep, collide1D, doublePendStep, softBodyStep, resonance, stressStrain, fmt } from "../physics";
 import { sfx } from "../sfx";
 
 const META = WORLDS.find((w) => w.id === "mechanics")!;
@@ -275,10 +275,101 @@ function CollisionUI() {
 }
 
 /* ================= Double Pendulum ================= */
+function DoublePendulumCanvas() {
+  const trail = useRef<{ x: number; y: number }[]>([]);
+  const state = useRef({ th1: 0, th2: 0, om1: 0, om2: 0 });
+  const ref = useCanvasLoop((ctx, w, h, _t, dt) => {
+    const sim = useStore.getState().sim;
+    const th1_0 = (Number(sim.dp_th1 ?? 120) * Math.PI) / 180;
+    const th2_0 = (Number(sim.dp_th2 ?? 120) * Math.PI) / 180;
+    const L1 = Number(sim.dp_L1 ?? 1);
+    const L2 = Number(sim.dp_L2 ?? 1);
+    const m1 = Number(sim.dp_m1 ?? 1);
+    const m2 = Number(sim.dp_m2 ?? 1);
+    const run = Number(sim.dp_run ?? 0);
+
+    // Initialize on first frame or reset
+    if (state.current.th1 === 0 && state.current.th2 === 0) {
+      state.current = { th1: th1_0, th2: th2_0, om1: 0, om2: 0 };
+      trail.current = [];
+    }
+
+    // Integrate
+    if (!useStore.getState().paused && run > 0) {
+      const steps = 10;
+      for (let i = 0; i < steps; i++) {
+        const next = doublePendStep(state.current, L1, L2, m1, m2, 9.81, dt / steps);
+        state.current = next;
+      }
+    }
+
+    const { th1, th2 } = state.current;
+    const cx = w / 2;
+    const cy = h * 0.3;
+    const scale = Math.min(w, h) * 0.2;
+
+    const x1 = cx + Math.sin(th1) * L1 * scale;
+    const y1 = cy + Math.cos(th1) * L1 * scale;
+    const x2 = x1 + Math.sin(th2) * L2 * scale;
+    const y2 = y1 + Math.cos(th2) * L2 * scale;
+
+    trail.current.push({ x: x2, y: y2 });
+    if (trail.current.length > 500) trail.current.shift();
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#0a0e1a";
+    ctx.fillRect(0, 0, w, h);
+
+    // Trail
+    ctx.strokeStyle = "rgba(255, 180, 84, 0.4)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    trail.current.forEach((p, i) => {
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.stroke();
+
+    // Arms
+    ctx.strokeStyle = "#ffb454";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    // Bobs
+    ctx.fillStyle = "#ffb454";
+    ctx.beginPath();
+    ctx.arc(x1, y1, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ff6b6b";
+    ctx.beginPath();
+    ctx.arc(x2, y2, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Pivot
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#ffb454";
+    ctx.font = "bold 14px 'IBM Plex Mono'";
+    ctx.fillText("Double Pendulum", 20, 30);
+    ctx.fillStyle = "#8fa3c8";
+    ctx.font = "11px 'IBM Plex Mono'";
+    ctx.fillText("Chaotic motion • Sensitive to initial conditions", 20, 48);
+  });
+  return <canvas ref={ref} className="block h-full w-full" />;
+}
+
 function DoublePendulumUI() {
   const sim = useStore((s) => s.sim);
   const setSim = useStore((s) => s.setSim);
   const bump = useStore((s) => s.bump);
+  const resetWorld = useStore((s) => s.resetWorld);
   const openEq = useStore((s) => s.openEq);
   const th1 = Number(sim.dp_th1 ?? 120);
   const th2 = Number(sim.dp_th2 ?? 120);
@@ -286,21 +377,19 @@ function DoublePendulumUI() {
   const L2 = Number(sim.dp_L2 ?? 1);
   const m1 = Number(sim.dp_m1 ?? 1);
   const m2 = Number(sim.dp_m2 ?? 1);
+  const run = Number(sim.dp_run ?? 0);
 
   return (
     <>
       <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
-        <div className="pv-panel hud-corners relative h-full w-full overflow-hidden rounded-xl">
-          <canvas className="block h-full w-full" />
-          <div className="absolute left-3 top-3 text-[12px] text-[#ffb454]">Double Pendulum</div>
-          <div className="absolute left-3 top-7 text-[10px] text-[#8fa3c8]">Chaotic motion • Sensitive to initial conditions</div>
-        </div>
+        <CanvasFrame className="h-full w-full"><DoublePendulumCanvas key={run} /></CanvasFrame>
       </div>
       <ControlPanel
         title="Double Pendulum Controls" color={META.color}
         footer={
           <>
             <Btn variant="primary" className="flex-1 !py-2 !text-[10px]" onClick={() => { bump("dp_run"); sfx.launch(); }}><Play size={12} /> Release</Btn>
+            <Btn variant="ghost" className="!px-3 !py-2 !text-[10px]" onClick={() => resetWorld()}><RotateCcw size={12} /></Btn>
           </>
         }
       >
@@ -324,29 +413,108 @@ function DoublePendulumUI() {
 }
 
 /* ================= Soft Body ================= */
+function SoftBodyCanvas() {
+  const nodes = useRef<{ x: number; y: number; vx: number; vy: number; m: number }[]>([]);
+  const springs = useRef<[number, number, number][]>([]);
+  const ref = useCanvasLoop((ctx, w, h, _t, dt) => {
+    const sim = useStore.getState().sim;
+    const k = Number(sim.sb_k ?? 500);
+    const damp = Number(sim.sb_damp ?? 2);
+    const g = Number(sim.sb_g ?? 9.81);
+    const run = Number(sim.sb_run ?? 0);
+
+    // Initialize grid on first frame
+    if (nodes.current.length === 0) {
+      const gridSize = 5;
+      const spacing = 30;
+      const startX = w / 2 - (gridSize * spacing) / 2;
+      const startY = h * 0.2;
+      for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+          nodes.current.push({
+            x: startX + i * spacing,
+            y: startY + j * spacing,
+            vx: 0,
+            vy: 0,
+            m: 1,
+          });
+        }
+      }
+      // Create springs
+      for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+          const idx = i * gridSize + j;
+          if (i < gridSize - 1) springs.current.push([idx, idx + 1, spacing]);
+          if (j < gridSize - 1) springs.current.push([idx, idx + gridSize, spacing]);
+          if (i < gridSize - 1 && j < gridSize - 1) {
+            springs.current.push([idx, idx + gridSize + 1, spacing * Math.sqrt(2)]);
+            springs.current.push([idx + 1, idx + gridSize, spacing * Math.sqrt(2)]);
+          }
+        }
+      }
+    }
+
+    // Integrate
+    if (!useStore.getState().paused && run > 0) {
+      softBodyStep(nodes.current, springs.current, k, damp, g, dt);
+    }
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#0a0e1a";
+    ctx.fillRect(0, 0, w, h);
+
+    // Draw springs
+    ctx.strokeStyle = "rgba(57, 240, 195, 0.3)";
+    ctx.lineWidth = 1;
+    for (const [i, j] of springs.current) {
+      const n1 = nodes.current[i];
+      const n2 = nodes.current[j];
+      ctx.beginPath();
+      ctx.moveTo(n1.x, n1.y);
+      ctx.lineTo(n2.x, n2.y);
+      ctx.stroke();
+    }
+
+    // Draw nodes
+    ctx.fillStyle = "#39f0c3";
+    for (const node of nodes.current) {
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = "#39f0c3";
+    ctx.font = "bold 14px 'IBM Plex Mono'";
+    ctx.fillText("Soft Body Jelly", 20, 30);
+    ctx.fillStyle = "#8fa3c8";
+    ctx.font = "11px 'IBM Plex Mono'";
+    ctx.fillText("Mass-spring system • Deformable object", 20, 48);
+  });
+  return <canvas ref={ref} className="block h-full w-full" />;
+}
+
 function SoftBodyUI() {
   const sim = useStore((s) => s.sim);
   const setSim = useStore((s) => s.setSim);
   const bump = useStore((s) => s.bump);
+  const resetWorld = useStore((s) => s.resetWorld);
   const openEq = useStore((s) => s.openEq);
   const k = Number(sim.sb_k ?? 500);
   const damp = Number(sim.sb_damp ?? 2);
   const g = Number(sim.sb_g ?? 9.81);
+  const run = Number(sim.sb_run ?? 0);
 
   return (
     <>
       <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
-        <div className="pv-panel hud-corners relative h-full w-full overflow-hidden rounded-xl">
-          <canvas className="block h-full w-full" />
-          <div className="absolute left-3 top-3 text-[12px] text-[#39f0c3]">Soft Body Jelly</div>
-          <div className="absolute left-3 top-7 text-[10px] text-[#8fa3c8]">Mass-spring system • Deformable object</div>
-        </div>
+        <CanvasFrame className="h-full w-full"><SoftBodyCanvas key={run} /></CanvasFrame>
       </div>
       <ControlPanel
         title="Soft Body Controls" color={META.color}
         footer={
           <>
             <Btn variant="primary" className="flex-1 !py-2 !text-[10px]" onClick={() => { bump("sb_run"); sfx.launch(); }}><Play size={12} /> Drop</Btn>
+            <Btn variant="ghost" className="!px-3 !py-2 !text-[10px]" onClick={() => resetWorld()}><RotateCcw size={12} /></Btn>
           </>
         }
       >
@@ -367,6 +535,74 @@ function SoftBodyUI() {
 }
 
 /* ================= Resonance & TMD ================= */
+function ResonanceCanvas() {
+  const ref = useCanvasLoop((ctx, w, h, t) => {
+    const sim = useStore.getState().sim;
+    const f = Number(sim.rs_f ?? 5);
+    const f0 = Number(sim.rs_f0 ?? 5);
+    const zeta = Number(sim.rs_zeta ?? 0.05);
+    const { amp, r } = resonance(f, f0, zeta);
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#0a0e1a";
+    ctx.fillRect(0, 0, w, h);
+
+    // Draw frequency response curve
+    const margin = 60;
+    const graphW = w - margin * 2;
+    const graphH = h * 0.4;
+    const graphY = h * 0.15;
+
+    ctx.strokeStyle = "rgba(255, 122, 156, 0.3)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i <= 100; i++) {
+      const freq = 0.1 + (i / 100) * 19.9;
+      const { amp: a } = resonance(freq, f0, zeta);
+      const x = margin + (i / 100) * graphW;
+      const y = graphY + graphH - (Math.min(a, 10) / 10) * graphH;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Current point
+    const currentX = margin + ((f - 0.1) / 19.9) * graphW;
+    const currentY = graphY + graphH - (Math.min(amp, 10) / 10) * graphH;
+    ctx.fillStyle = "#ff7a9c";
+    ctx.beginPath();
+    ctx.arc(currentX, currentY, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Draw oscillator
+    const oscX = w / 2;
+    const oscY = h * 0.75;
+    const displacement = Math.sin(t * f * 2 * Math.PI) * amp * 20;
+    ctx.fillStyle = "#ff7a9c";
+    ctx.fillRect(oscX - 30 + displacement, oscY - 20, 60, 40);
+    ctx.strokeStyle = "#ff7a9c";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(oscX - 50, oscY);
+    ctx.lineTo(oscX - 30 + displacement, oscY);
+    ctx.stroke();
+
+    // Labels
+    ctx.fillStyle = "#ff7a9c";
+    ctx.font = "bold 14px 'IBM Plex Mono'";
+    ctx.fillText("Resonance & TMD", 20, 30);
+    ctx.fillStyle = "#8fa3c8";
+    ctx.font = "11px 'IBM Plex Mono'";
+    ctx.fillText("Tuned mass damper • Frequency response", 20, 48);
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "12px 'IBM Plex Mono'";
+    ctx.fillText(`r = f/f₀ = ${r.toFixed(2)}`, margin, graphY + graphH + 30);
+    ctx.fillText(`Amplitude = ${amp.toFixed(2)}`, margin, graphY + graphH + 50);
+  });
+  return <canvas ref={ref} className="block h-full w-full" />;
+}
+
 function ResonanceUI() {
   const sim = useStore((s) => s.sim);
   const setSim = useStore((s) => s.setSim);
@@ -374,65 +610,145 @@ function ResonanceUI() {
   const f = Number(sim.rs_f ?? 5);
   const f0 = Number(sim.rs_f0 ?? 5);
   const zeta = Number(sim.rs_zeta ?? 0.05);
+  const { amp, r } = resonance(f, f0, zeta);
 
   return (
     <>
       <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
-        <div className="pv-panel hud-corners relative h-full w-full overflow-hidden rounded-xl">
-          <canvas className="block h-full w-full" />
-          <div className="absolute left-3 top-3 text-[12px] text-[#ff7a9c]">Resonance & TMD</div>
-          <div className="absolute left-3 top-7 text-[10px] text-[#8fa3c8]">Tuned mass damper • Frequency response</div>
-        </div>
+        <CanvasFrame className="h-full w-full"><ResonanceCanvas /></CanvasFrame>
       </div>
       <ControlPanel
         title="Resonance Controls" color={META.color}
-      >
-        <Slider label="Driving frequency" unit="Hz" min={0.1} max={20} step={0.1} value={f} onChange={(v) => setSim("rs_f", v)} />
-        <Slider label="Natural frequency" unit="Hz" min={0.1} max={20} step={0.1} value={f0} onChange={(v) => setSim("rs_f0", v)} />
-        <Slider label="Damping ratio ζ" unit="" min={0.01} max={1} step={0.01} value={zeta} onChange={(v) => setSim("rs_zeta", v)} />
-        <EqButton onClick={() => openEq({
+        footer={<EqButton onClick={() => openEq({
           title: "Resonance",
           formula: "A(ω) = 1/√((1-r²)² + (2ζr)²)",
           vars: [["f", `${f} Hz`], ["f₀", `${f0} Hz`], ["ζ", `${zeta}`]],
           steps: ["r = f/f₀ (frequency ratio)", "Amplitude peaks at resonance", "Damping limits peak amplitude", "TMD adds secondary oscillator"],
           result: "Resonant amplification",
           note: "Resonance can cause structural failure. Tuned mass dampers (TMD) reduce vibration.",
-        })} />
+        })} />}
+      >
+        <Slider label="Driving frequency" unit="Hz" min={0.1} max={20} step={0.1} value={f} onChange={(v) => setSim("rs_f", v)} />
+        <Slider label="Natural frequency" unit="Hz" min={0.1} max={20} step={0.1} value={f0} onChange={(v) => setSim("rs_f0", v)} />
+        <Slider label="Damping ratio ζ" unit="" min={0.01} max={1} step={0.01} value={zeta} onChange={(v) => setSim("rs_zeta", v)} />
+        <div className="grid grid-cols-2 gap-1.5">
+          <Stat label="Frequency ratio r" value={fmt(r, 2)} unit="" />
+          <Stat label="Amplitude" value={fmt(amp, 2)} unit="" accent="#ff7a9c" />
+        </div>
       </ControlPanel>
     </>
   );
 }
 
 /* ================= Stress-Strain FEA ================= */
+function FEACanvas() {
+  const ref = useCanvasLoop((ctx, w, h) => {
+    const sim = useStore.getState().sim;
+    const E = Number(sim.fea_E ?? 2e11);
+    const strain = Number(sim.fea_strain ?? 0.001);
+    const { stress, elastic } = stressStrain(E, strain);
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#0a0e1a";
+    ctx.fillRect(0, 0, w, h);
+
+    // Draw beam with deformation
+    const beamX = w * 0.15;
+    const beamY = h * 0.4;
+    const beamW = w * 0.7;
+    const beamH = 60;
+    const deformation = strain * beamW * 0.5;
+
+    // Original beam (ghost)
+    ctx.strokeStyle = "rgba(255, 180, 84, 0.2)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(beamX, beamY, beamW, beamH);
+
+    // Deformed beam
+    const gradient = ctx.createLinearGradient(beamX, 0, beamX + beamW, 0);
+    gradient.addColorStop(0, elastic ? "#ffb454" : "#ff6b6b");
+    gradient.addColorStop(1, elastic ? "#ff6b6b" : "#ff4757");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(beamX, beamY, beamW + deformation, beamH);
+
+    // Stress visualization (color intensity)
+    const stressIntensity = Math.min(stress / 1e9, 1);
+    ctx.fillStyle = `rgba(255, 107, 107, ${stressIntensity * 0.5})`;
+    ctx.fillRect(beamX, beamY, beamW + deformation, beamH);
+
+    // Draw mesh lines
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+    ctx.lineWidth = 1;
+    const meshSize = 30;
+    for (let x = beamX; x < beamX + beamW + deformation; x += meshSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, beamY);
+      ctx.lineTo(x, beamY + beamH);
+      ctx.stroke();
+    }
+    for (let y = beamY; y < beamY + beamH; y += meshSize) {
+      ctx.beginPath();
+      ctx.moveTo(beamX, y);
+      ctx.lineTo(beamX + beamW + deformation, y);
+      ctx.stroke();
+    }
+
+    // Force arrows
+    ctx.fillStyle = "#ff6b6b";
+    ctx.beginPath();
+    ctx.moveTo(beamX + beamW + deformation + 20, beamY + beamH / 2);
+    ctx.lineTo(beamX + beamW + deformation + 40, beamY + beamH / 2 - 10);
+    ctx.lineTo(beamX + beamW + deformation + 40, beamY + beamH / 2 + 10);
+    ctx.closePath();
+    ctx.fill();
+
+    // Labels
+    ctx.fillStyle = "#ffb454";
+    ctx.font = "bold 14px 'IBM Plex Mono'";
+    ctx.fillText("Stress-Strain FEA", 20, 30);
+    ctx.fillStyle = "#8fa3c8";
+    ctx.font = "11px 'IBM Plex Mono'";
+    ctx.fillText("Finite element analysis • Material deformation", 20, 48);
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "12px 'IBM Plex Mono'";
+    ctx.fillText(`Stress σ = ${(stress / 1e6).toFixed(1)} MPa`, 20, h * 0.75);
+    ctx.fillText(`Strain ε = ${(strain * 100).toFixed(3)}%`, 20, h * 0.75 + 20);
+    ctx.fillText(`Region: ${elastic ? "Elastic" : "Plastic"}`, 20, h * 0.75 + 40);
+  });
+  return <canvas ref={ref} className="block h-full w-full" />;
+}
+
 function FEAUI() {
   const sim = useStore((s) => s.sim);
   const setSim = useStore((s) => s.setSim);
   const openEq = useStore((s) => s.openEq);
   const E = Number(sim.fea_E ?? 2e11);
   const strain = Number(sim.fea_strain ?? 0.001);
+  const { stress, elastic } = stressStrain(E, strain);
 
   return (
     <>
       <div className="pointer-events-auto absolute bottom-[4.9rem] left-3 right-3 top-[6.6rem] md:bottom-4 md:left-[11.5rem] md:right-[21.5rem] md:top-16">
-        <div className="pv-panel hud-corners relative h-full w-full overflow-hidden rounded-xl">
-          <canvas className="block h-full w-full" />
-          <div className="absolute left-3 top-3 text-[12px] text-[#ffb454]">Stress-Strain FEA</div>
-          <div className="absolute left-3 top-7 text-[10px] text-[#8fa3c8]">Finite element analysis • Material deformation</div>
-        </div>
+        <CanvasFrame className="h-full w-full"><FEACanvas /></CanvasFrame>
       </div>
       <ControlPanel
         title="FEA Controls" color={META.color}
-      >
-        <Slider label="Young's modulus" unit="GPa" min={50} max={300} step={10} value={E / 1e9} onChange={(v) => setSim("fea_E", v * 1e9)} />
-        <Slider label="Strain" unit="%" min={0} max={5} step={0.01} value={strain * 100} onChange={(v) => setSim("fea_strain", v / 100)} />
-        <EqButton onClick={() => openEq({
+        footer={<EqButton onClick={() => openEq({
           title: "Stress-Strain",
           formula: "σ = E·ε (elastic region)",
           vars: [["E", `${(E / 1e9).toFixed(0)} GPa`], ["ε", `${(strain * 100).toFixed(2)}%`]],
           steps: ["Hooke's law in 1D", "Linear elastic region", "Yield point marks plastic deformation", "FEA discretizes complex geometries"],
           result: "Material response",
           note: "Finite element analysis solves complex stress distributions numerically.",
-        })} />
+        })} />}
+      >
+        <Slider label="Young's modulus" unit="GPa" min={50} max={300} step={10} value={E / 1e9} onChange={(v) => setSim("fea_E", v * 1e9)} />
+        <Slider label="Strain" unit="%" min={0} max={5} step={0.01} value={strain * 100} onChange={(v) => setSim("fea_strain", v / 100)} />
+        <div className="grid grid-cols-2 gap-1.5">
+          <Stat label="Stress σ" value={fmt(stress / 1e6, 1)} unit="MPa" accent="#ffb454" />
+          <Stat label="Region" value={elastic ? "Elastic" : "Plastic"} unit="" />
+        </div>
       </ControlPanel>
     </>
   );
